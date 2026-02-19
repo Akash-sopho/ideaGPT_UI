@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { theme, fonts } from '../config/theme.config';
 import { appConfig } from '../config/app.config';
+import { ApiSearchView } from '../components/ApiSearchView';
 
 const cfg = () => appConfig.ideaScreen || {};
 
@@ -20,6 +21,7 @@ export function IdeaScreen({
   errorSummarise,
   errorFeatures,
 }) {
+  const [startTab, setStartTab] = useState('idea');
   const [chatDraft, setChatDraft] = useState('');
   const chatInputRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -40,7 +42,58 @@ export function IdeaScreen({
   };
 
   return (
-    <div className="fu" style={{ maxWidth: 620, margin: '72px auto 0' }}>
+    <div className="fu" style={{ maxWidth: 720, margin: '72px auto 0' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 4,
+          marginBottom: 28,
+          borderBottom: `1px solid ${theme.border}`,
+          paddingBottom: 0,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setStartTab('idea')}
+          style={{
+            padding: '10px 18px',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: startTab === 'idea' ? `2px solid ${theme.navy}` : '2px solid transparent',
+            color: startTab === 'idea' ? theme.navy : theme.muted,
+            fontSize: 14,
+            fontWeight: startTab === 'idea' ? 600 : 500,
+            fontFamily: fonts.sans,
+            cursor: 'pointer',
+            marginBottom: -1,
+          }}
+        >
+          {cfg().describeIdeaTabLabel || 'Describe your idea'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setStartTab('apis')}
+          style={{
+            padding: '10px 18px',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: startTab === 'apis' ? `2px solid ${theme.navy}` : '2px solid transparent',
+            color: startTab === 'apis' ? theme.navy : theme.muted,
+            fontSize: 14,
+            fontWeight: startTab === 'apis' ? 600 : 500,
+            fontFamily: fonts.sans,
+            cursor: 'pointer',
+            marginBottom: -1,
+          }}
+        >
+          {cfg().browseApisTabLabel || 'Browse APIs'}
+        </button>
+      </div>
+
+      {startTab === 'apis' && <ApiSearchView />}
+
+      {startTab === 'idea' && (
+        <>
       <div style={{ textAlign: 'center', marginBottom: 44 }}>
         <div
           style={{
@@ -376,6 +429,8 @@ export function IdeaScreen({
           </button>
         ))}
       </div>
+        </>
+      )}
     </div>
   );
 }

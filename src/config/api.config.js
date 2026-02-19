@@ -11,4 +11,6 @@ export const apiPaths = {
   jira: '/llm/jira',
   ragLookup: '/api/rag/lookup',
   ragRerank: '/api/rag/rerank',
+  catalog: '/catalog',
+  search: '/search',
 };

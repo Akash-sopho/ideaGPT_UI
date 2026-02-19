@@ -18,6 +18,11 @@ export function APISuggestionsPopup({
   loadingRerank = false,
 }) {
   const [additionalInfo, setAdditionalInfo] = useState('');
+  const [expandedKey, setExpandedKey] = useState(null);
+
+  const toggleExpanded = (key) => {
+    setExpandedKey((prev) => (prev === key ? null : key));
+  };
 
   const handleRefine = () => {
     if (onRerank && additionalInfo.trim()) {
@@ -193,100 +198,179 @@ export function APISuggestionsPopup({
                   const api = item.api || item;
                   const score = typeof item.score === 'number' ? item.score : item.score ?? 0;
                   const methodStyle = methodColor[api.method] || { bg: theme.alt, col: theme.muted, border: theme.border };
+                  const rowKey = `${api.endpoint || ''}-${index}`;
+                  const isExpanded = expandedKey === rowKey;
                   return (
                     <li
-                      key={api.endpoint + index}
+                      key={rowKey}
                       style={{
                         padding: '12px 14px',
                         borderBottom: index < suggestedApis.length - 1 ? `1px solid ${theme.border}` : 'none',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        flexWrap: 'wrap',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        cursor: 'pointer',
+                        background: isExpanded ? theme.surface : 'transparent',
+                        borderRadius: 6,
                       }}
+                      onClick={() => toggleExpanded(rowKey)}
                     >
-                      <span
+                      <div
                         style={{
-                          width: 28,
-                          color: theme.faint,
-                          fontSize: 12,
-                          fontFamily: fonts.mono,
-                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          flexWrap: 'wrap',
                         }}
                       >
-                        #{index + 1}
-                      </span>
-                      <span
-                        style={{
-                          background: methodStyle.bg,
-                          color: methodStyle.col,
-                          border: `1px solid ${methodStyle.border}`,
-                          borderRadius: 4,
-                          padding: '2px 6px',
-                          fontSize: 10,
-                          fontWeight: 700,
-                          fontFamily: fonts.mono,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {api.method || '—'}
-                      </span>
-                      <span
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          color: theme.ink,
-                          fontSize: 13,
-                          fontWeight: 600,
-                          fontFamily: fonts.sans,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {api.name || api.endpoint || '—'}
-                      </span>
-                      <span
-                        style={{
-                          color: theme.muted,
-                          fontSize: 12,
-                          fontFamily: fonts.mono,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {Math.round(score * 100)}%
-                      </span>
-                      <span
-                        style={{
-                          maxWidth: 160,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          color: theme.faint,
-                          fontSize: 11,
-                          fontFamily: fonts.mono,
-                        }}
-                      >
-                        {api.endpoint || '—'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleSelect(item)}
-                        style={{
-                          padding: '6px 14px',
-                          background: theme.green,
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: 8,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          fontFamily: fonts.sans,
-                          flexShrink: 0,
-                        }}
-                      >
-                        Use this
-                      </button>
+                        <span
+                          style={{
+                            width: 20,
+                            color: theme.faint,
+                            fontSize: 11,
+                            fontFamily: fonts.mono,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isExpanded ? '▼' : '▶'}
+                        </span>
+                        <span
+                          style={{
+                            width: 28,
+                            color: theme.faint,
+                            fontSize: 12,
+                            fontFamily: fonts.mono,
+                            flexShrink: 0,
+                          }}
+                        >
+                          #{index + 1}
+                        </span>
+                        <span
+                          style={{
+                            background: methodStyle.bg,
+                            color: methodStyle.col,
+                            border: `1px solid ${methodStyle.border}`,
+                            borderRadius: 4,
+                            padding: '2px 6px',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            fontFamily: fonts.mono,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {api.method || '—'}
+                        </span>
+                        <span
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            color: theme.ink,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            fontFamily: fonts.sans,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {api.name || api.endpoint || '—'}
+                        </span>
+                        <span
+                          style={{
+                            color: theme.muted,
+                            fontSize: 12,
+                            fontFamily: fonts.mono,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {Math.round(score * 100)}%
+                        </span>
+                        <span
+                          style={{
+                            maxWidth: 160,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            color: theme.faint,
+                            fontSize: 11,
+                            fontFamily: fonts.mono,
+                          }}
+                        >
+                          {api.endpoint || '—'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelect(item);
+                          }}
+                          style={{
+                            padding: '6px 14px',
+                            background: theme.green,
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 8,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            fontFamily: fonts.sans,
+                            flexShrink: 0,
+                          }}
+                        >
+                          Use this
+                        </button>
+                      </div>
+                      {isExpanded && (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            paddingTop: 12,
+                            borderTop: `1px solid ${theme.border}`,
+                            paddingLeft: 48,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 10,
+                          }}
+                        >
+                          {api.desc && (
+                            <p style={{ margin: 0, color: theme.muted, fontSize: 12, lineHeight: 1.6, fontFamily: fonts.sans }}>
+                              {api.desc}
+                            </p>
+                          )}
+                          <div style={{ fontFamily: fonts.mono, fontSize: 11, color: theme.faint, wordBreak: 'break-all' }}>
+                            {api.endpoint || '—'}
+                          </div>
+                          {(api.author || api.team) && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <div style={{ color: theme.faint, fontSize: 10, fontFamily: fonts.mono, letterSpacing: 1 }}>
+                                OWNERSHIP
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, color: theme.ink }}>
+                                {api.author && <span>Owner: {api.author}</span>}
+                                {api.team && <span>Team: {api.team}</span>}
+                              </div>
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                            {api.status && (
+                              <span style={{ fontSize: 11, color: theme.muted }}>Status: {api.status}</span>
+                            )}
+                            {api.version && (
+                              <span style={{ fontSize: 11, color: theme.muted }}>Version: {api.version}</span>
+                            )}
+                            {api.contract && (
+                              <span style={{ fontSize: 11, color: theme.blue }}>Contract: {api.contract}</span>
+                            )}
+                          </div>
+                          {(api.sla || api.latency || api.calls) && (
+                            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, color: theme.muted }}>
+                              {api.sla != null && api.sla !== '' && <span>SLA: {api.sla}</span>}
+                              {api.latency != null && api.latency !== '' && <span>Latency: {api.latency}</span>}
+                              {api.calls != null && api.calls !== '' && <span>Volume: {api.calls}</span>}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </li>
                   );
                 })}
