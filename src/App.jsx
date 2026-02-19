@@ -222,11 +222,13 @@ export default function App() {
   }, [summaryResult]);
 
   const handleMapJourneys = useCallback(async () => {
-    const selectedFeatures = features.filter((f) => f.on).map((f) => f.title);
+    const selected = features.filter((f) => f.on);
+    const selectedFeatures = selected.map((f) => f.title);
+    const selectedFeatureDescriptions = selected.map((f) => ({ title: f.title, description: f.desc || '' }));
     setLoadingPersonaSuggestions(true);
     setErrors((e) => ({ ...e, personaSuggestions: null }));
     try {
-      const res = await suggestPersonas({ idea, ideaSummary, selectedFeatures });
+      const res = await suggestPersonas({ idea, ideaSummary, selectedFeatures, selectedFeatureDescriptions });
       const suggestions = (res.personas || []).map((p) => ({
         ...p,
         colorBg: getPersonaTheme(p.color).colorBg,
@@ -245,7 +247,9 @@ export default function App() {
 
   const handleConfirmPersonas = useCallback(
     async (selectedList) => {
-      const selectedFeatures = features.filter((f) => f.on).map((f) => f.title);
+      const selected = features.filter((f) => f.on);
+      const selectedFeatures = selected.map((f) => f.title);
+      const selectedFeatureDescriptions = selected.map((f) => ({ title: f.title, description: f.desc || '' }));
       setLoadingJourneys(true);
       setErrors((e) => ({ ...e, journeys: null }));
       try {
@@ -257,7 +261,7 @@ export default function App() {
           color: p.color,
           suggested_journeys: p.suggested_journeys || [],
         }));
-        const res = await generateJourneys({ idea, selectedFeatures, confirmedPersonas: confirmed });
+        const res = await generateJourneys({ idea, selectedFeatures, selectedFeatureDescriptions, confirmedPersonas: confirmed });
         const rawPersonas = res.personas || [];
         const merged = rawPersonas.map((p) => {
           const confirmedP = selectedList.find((c) => c.id === p.id);
