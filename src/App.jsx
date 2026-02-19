@@ -66,7 +66,8 @@ export default function App() {
   });
   const [drawerAPI, setDrawerAPI] = useState(null);
   const [drawerEnhancements, setDrawerEnhancements] = useState(null);
-  const [suggestionsPopupApiKey, setSuggestionsPopupApiKey] = useState(null);
+  const [stepIO, setStepIO] = useState({});
+  const [suggestionsPopupStepId, setSuggestionsPopupStepId] = useState(null);
   const [loadingRerank, setLoadingRerank] = useState(false);
   const [activeTab, setActiveTab] = useState('');
   const [activeJourney, setActiveJourney] = useState({});
@@ -86,6 +87,7 @@ export default function App() {
         setUniqueApiKeys([]);
         setApiCatalog({});
         setDescriptionCache({});
+        setStepIO({});
         setJiraTickets({});
         setScanProgress({ total: 0, done: 0, current: '' });
         setLoadingPersonaSuggestions(false);
@@ -107,6 +109,7 @@ export default function App() {
         setUniqueApiKeys([]);
         setApiCatalog({});
         setDescriptionCache({});
+        setStepIO({});
         setJiraTickets({});
         setScanProgress({ total: 0, done: 0, current: '' });
         setLoadingPersonaSuggestions(false);
@@ -125,6 +128,7 @@ export default function App() {
         setUniqueApiKeys([]);
         setApiCatalog({});
         setDescriptionCache({});
+        setStepIO({});
         setJiraTickets({});
         setScanProgress({ total: 0, done: 0, current: '' });
         setLoadingJourneys(false);
@@ -135,6 +139,7 @@ export default function App() {
       case 'review':
         setApiCatalog({});
         setDescriptionCache({});
+        setStepIO({});
         setJiraTickets({});
         setScanProgress({ total: 0, done: 0, current: '' });
         setLoadingJira(false);
@@ -321,7 +326,7 @@ export default function App() {
     const batchSize = scanConfig.batchSize || 10;
     const messages = scanConfig.loadingMessages || [];
 
-    setScanProgress({ total: keys.length * 2, done: 0, current: messages[0] });
+    setScanProgress({ total: keys.length, done: 0, current: messages[0] });
 
     const localDescCache = {};
 
@@ -356,37 +361,83 @@ export default function App() {
         }));
       }
 
-      keys.forEach((key) => setApiCatalog((c) => ({ ...c, [key]: 'loading' })));
+      const allStepsForRag = [];
+      personas.forEach((persona) => {
+        (persona.journeys || []).forEach((journey) => {
+          (journey.steps || []).forEach((step) => {
+            allStepsForRag.push({ step, persona, journey });
+          });
+        });
+      });
 
-      const ragPromises = keys.map(async (api_key) => {
-        const desc = localDescCache[api_key] || {};
-        const ctx = stepContextByKey[api_key] || {};
+      const stepIOUpdate = {};
+      personas.forEach((persona) => {
+        (persona.journeys || []).forEach((journey) => {
+          const steps = journey.steps || [];
+          steps.forEach((step, i) => {
+            const desc = localDescCache[step.api] || {};
+            if (i === 0) {
+              stepIOUpdate[step.id] = {
+                input: desc.input_schema || '',
+                output: desc.output_schema || '',
+              };
+            } else {
+              const prev = steps[i - 1];
+              stepIOUpdate[step.id] = {
+                input: stepIOUpdate[prev.id]?.output ?? '',
+                output: desc.output_schema || '',
+              };
+            }
+          });
+        });
+      });
+      setStepIO((prev) => ({ ...prev, ...stepIOUpdate }));
+
+      allStepsForRag.forEach(({ step }) => {
+        setApiCatalog((c) => ({ ...c, [step.id]: 'loading' }));
+      });
+      setScanProgress((p) => ({
+        ...p,
+        total: keys.length + allStepsForRag.length,
+        done: keys.length,
+        current: messages[0] || p.current,
+      }));
+
+      const ragPromises = allStepsForRag.map(async ({ step, persona, journey }) => {
+        const desc = localDescCache[step.api] || {};
+        const expected_io = {
+          input_schema: stepIOUpdate[step.id]?.input ?? '',
+          output_schema: stepIOUpdate[step.id]?.output ?? '',
+        };
         const context = {
           product_idea: idea,
-          persona: ctx.persona_label,
-          journey: ctx.journey_title,
-          step_label: ctx.step_label,
-        };
-        const expected_io = {
-          input_schema: desc.input_schema,
-          output_schema: desc.output_schema,
+          persona: persona.label,
+          journey: journey.title,
+          step_label: step.label,
         };
         try {
           const result = await ragLookup({
-            query_key: api_key,
+            query_key: step.id,
             description: desc.description,
             context,
             expected_io,
           });
           return {
-            api_key,
+            stepId: step.id,
+            api_key: step.api,
             result,
             _query: { description: desc.description, context, expected_io },
           };
         } catch (err) {
           return {
-            api_key,
-            result: { query_key: api_key, match_status: 'none', build_required: true, suggested_apis: [] },
+            stepId: step.id,
+            api_key: step.api,
+            result: {
+              query_key: step.id,
+              match_status: 'none',
+              build_required: true,
+              suggested_apis: [],
+            },
             _query: { description: desc.description, context, expected_io },
           };
         }
@@ -394,11 +445,15 @@ export default function App() {
 
       const ragResults = await Promise.all(ragPromises);
       const catalogUpdate = {};
-      ragResults.forEach(({ api_key, result, _query }) => {
-        catalogUpdate[api_key] = { ...result, _query };
+      ragResults.forEach(({ stepId, result, _query }) => {
+        catalogUpdate[stepId] = { ...result, _query };
       });
       setApiCatalog((c) => ({ ...c, ...catalogUpdate }));
-      setScanProgress((p) => ({ ...p, done: p.total, current: messages[messages.length - 1] || p.current }));
+      setScanProgress((p) => ({
+        ...p,
+        done: p.total,
+        current: messages[messages.length - 1] || p.current,
+      }));
       setPhase('diagram');
 
       const missingSet = new Set(
@@ -412,6 +467,7 @@ export default function App() {
         (persona.journeys || []).forEach((journey) => {
           (journey.steps || []).forEach((step) => {
             allSteps.push({
+              step_id: step.id,
               api_key: step.api,
               step_label: step.label,
               journey_title: journey.title,
@@ -436,7 +492,8 @@ export default function App() {
         const affected = stepsByApiKey[api_key] || [];
         const stepCount = affected.length;
         const suggested_priority = stepCount > halfJourneys ? 'P0' : 'P1';
-        const ragResult = catalogUpdate[api_key] || {};
+        const ragResultForKey = ragResults.find((r) => r.api_key === api_key);
+        const ragResult = ragResultForKey ? catalogUpdate[ragResultForKey.stepId] : {};
         generateJiraTicket({
           api_key,
           idea,
@@ -545,12 +602,34 @@ export default function App() {
 
   const allSteps = personas.flatMap((p) => (p.journeys || []).flatMap((j) => (j.steps || [])));
   const covered = allSteps.filter((s) => {
-    const r = apiCatalog[s.api];
+    const r = apiCatalog[s.id];
     return r && r !== 'loading' && r.match_status !== 'none';
   });
   const coveragePct = allSteps.length ? Math.round((covered.length / allSteps.length) * 100) : 0;
-  const missingApiKeys = [...new Set(allSteps.filter((s) => !apiCatalog[s.api] || apiCatalog[s.api] === 'loading' || apiCatalog[s.api].match_status === 'none').map((s) => s.api))];
-  const missingJiraKeys = missingApiKeys.filter((k) => apiCatalog[k] && apiCatalog[k] !== 'loading' && (apiCatalog[k].match_status === 'none' || apiCatalog[k].build_required));
+  const missingApiKeys = [
+    ...new Set(
+      allSteps
+        .filter(
+          (s) =>
+            !apiCatalog[s.id] ||
+            apiCatalog[s.id] === 'loading' ||
+            apiCatalog[s.id].match_status === 'none'
+        )
+        .map((s) => s.api)
+    ),
+  ];
+  const missingJiraKeys = [
+    ...new Set(
+      allSteps
+        .filter(
+          (s) =>
+            apiCatalog[s.id] &&
+            apiCatalog[s.id] !== 'loading' &&
+            (apiCatalog[s.id].match_status === 'none' || apiCatalog[s.id].build_required)
+        )
+        .map((s) => s.api)
+    ),
+  ];
   const totalDays = missingJiraKeys.reduce((a, k) => a + (jiraTickets[k]?.days || 0), 0);
 
   const openDrawer = (api, enhancements) => {
@@ -558,12 +637,71 @@ export default function App() {
     setDrawerEnhancements(enhancements || null);
   };
 
-  const openSuggestionsPopup = (apiKey, api, enhancements) => {
-    setSuggestionsPopupApiKey(apiKey);
+  const openSuggestionsPopup = (stepId, api, enhancements) => {
+    setSuggestionsPopupStepId(stepId);
   };
 
-  const handleRerank = useCallback(async (apiKey, additionalInfo) => {
-    const entry = apiCatalogRef.current[apiKey];
+  const handleStepIOChange = useCallback((stepId, { input, output }) => {
+    setStepIO((prev) => ({
+      ...prev,
+      [stepId]: { input: input ?? prev[stepId]?.input ?? '', output: output ?? prev[stepId]?.output ?? '' },
+    }));
+  }, []);
+
+  const handleRematchStep = useCallback(
+    async (stepId) => {
+      const step = allSteps.find((s) => s.id === stepId);
+      if (!step) return;
+      const desc = descriptionCache[step.api] || {};
+      const io = stepIO[stepId] || {};
+      const persona = (personas || []).find((p) =>
+        (p.journeys || []).some((j) => (j.steps || []).some((s) => s.id === stepId))
+      );
+      const journey = (personas || [])
+        .flatMap((p) => p.journeys || [])
+        .find((j) => (j.steps || []).some((s) => s.id === stepId));
+      setApiCatalog((c) => ({ ...c, [stepId]: 'loading' }));
+      try {
+        const result = await ragLookup({
+          query_key: stepId,
+          description: desc.description,
+          context: {
+            product_idea: idea,
+            persona: persona?.label ?? '',
+            journey: journey?.title ?? '',
+            step_label: step.label,
+          },
+          expected_io: { input_schema: io.input ?? '', output_schema: io.output ?? '' },
+        });
+        setApiCatalog((c) => ({
+          ...c,
+          [stepId]: {
+            ...result,
+            _query: {
+              description: desc.description,
+              context: { product_idea: idea, persona: persona?.label, journey: journey?.title, step_label: step.label },
+              expected_io: { input_schema: io.input, output_schema: io.output },
+            },
+          },
+        }));
+      } catch (err) {
+        setApiCatalog((c) => ({
+          ...c,
+          [stepId]: {
+            query_key: stepId,
+            match_status: 'none',
+            build_required: true,
+            suggested_apis: [],
+            _query: {},
+          },
+        }));
+      }
+    },
+    [idea, personas, descriptionCache, stepIO, allSteps]
+  );
+
+  const handleRerank = useCallback(async (stepId, additionalInfo) => {
+    const entry = apiCatalogRef.current[stepId];
     if (!entry || typeof entry !== 'object' || !entry._query) return;
     const { description, context, expected_io } = entry._query;
     const suggested_apis = entry.suggested_apis || [];
@@ -571,7 +709,7 @@ export default function App() {
     setLoadingRerank(true);
     try {
       const res = await ragRerank({
-        query_key: apiKey,
+        query_key: stepId,
         description,
         context,
         expected_io,
@@ -582,12 +720,12 @@ export default function App() {
       const newFirst = newList[0]?.api || null;
       setApiCatalog((c) => ({
         ...c,
-        [apiKey]: {
-          ...(c[apiKey] || {}),
+        [stepId]: {
+          ...(c[stepId] || {}),
           suggested_apis: newList,
           matched_api: newFirst,
-          confidence_score: newList[0]?.score ?? (c[apiKey]?.confidence_score ?? 0),
-          _query: (c[apiKey] || entry)._query,
+          confidence_score: newList[0]?.score ?? (c[stepId]?.confidence_score ?? 0),
+          _query: (c[stepId] || entry)._query,
         },
       }));
     } finally {
@@ -595,20 +733,20 @@ export default function App() {
     }
   }, []);
 
-  const handleSelectApi = useCallback((apiKey, api) => {
-    const entry = apiCatalogRef.current[apiKey];
+  const handleSelectApi = useCallback((stepId, api) => {
+    const entry = apiCatalogRef.current[stepId];
     if (!entry || typeof entry !== 'object') return;
     const single = [{ api, score: entry.confidence_score ?? 1 }];
     setApiCatalog((c) => ({
       ...c,
-      [apiKey]: {
-        ...(c[apiKey] || entry),
+      [stepId]: {
+        ...(c[stepId] || entry),
         matched_api: api,
         suggested_apis: single,
-        _query: (c[apiKey] || entry)._query,
+        _query: (c[stepId] || entry)._query,
       },
     }));
-    setSuggestionsPopupApiKey(null);
+    setSuggestionsPopupStepId(null);
   }, []);
 
   const header = (
@@ -786,6 +924,11 @@ export default function App() {
             onBack={() => setPhase('persona-suggestion')}
             onRegenerateJourneys={handleRegenerateJourneys}
             loadingRegenerate={loadingJourneys}
+            apiCatalog={apiCatalog}
+            stepIO={stepIO}
+            onStepIOChange={handleStepIOChange}
+            onRematchStep={handleRematchStep}
+            onGoToApiMap={() => setPhase('review')}
           />
         )}
 
@@ -814,6 +957,9 @@ export default function App() {
           <DiagramScreen
             personas={personas}
             apiCatalog={apiCatalog}
+            stepIO={stepIO}
+            onStepIOChange={handleStepIOChange}
+            onRematchStep={handleRematchStep}
             coveragePct={coveragePct}
             coveredCount={covered.length}
             allStepsCount={allSteps.length}
@@ -825,6 +971,7 @@ export default function App() {
             onOpenSuggestionsPopup={openSuggestionsPopup}
             onScrollToJira={() => setPhase('jira')}
             onRescan={handleScan}
+            onBackToJourneys={() => setPhase('personas')}
           />
         )}
 
@@ -846,8 +993,8 @@ export default function App() {
           setDrawerEnhancements(null);
         }}
       />
-      {suggestionsPopupApiKey && (() => {
-        const entry = apiCatalog[suggestionsPopupApiKey];
+      {suggestionsPopupStepId && (() => {
+        const entry = apiCatalog[suggestionsPopupStepId];
         const raw = entry && typeof entry === 'object' ? (entry.suggested_apis || []) : [];
         const suggestedApis =
           raw.length > 0
@@ -856,23 +1003,15 @@ export default function App() {
               ? [{ api: entry.matched_api, score: entry.confidence_score ?? 0 }]
               : [];
         const enhancements = entry && typeof entry === 'object' ? (entry.enhancements || []) : [];
-        let stepLabel = suggestionsPopupApiKey;
-        for (const p of personas || []) {
-          for (const j of p.journeys || []) {
-            const step = (j.steps || []).find((s) => s.api === suggestionsPopupApiKey);
-            if (step) {
-              stepLabel = step.label;
-              break;
-            }
-          }
-        }
+        const step = allSteps.find((s) => s.id === suggestionsPopupStepId);
+        const stepLabel = step?.label ?? suggestionsPopupStepId;
         return (
           <APISuggestionsPopup
-            apiKey={suggestionsPopupApiKey}
+            stepId={suggestionsPopupStepId}
             stepLabel={stepLabel}
             suggestedApis={suggestedApis}
             enhancements={enhancements}
-            onClose={() => setSuggestionsPopupApiKey(null)}
+            onClose={() => setSuggestionsPopupStepId(null)}
             onRerank={handleRerank}
             onSelectApi={handleSelectApi}
             loadingRerank={loadingRerank}

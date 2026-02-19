@@ -1,14 +1,39 @@
+import { useState } from 'react';
 import { theme, fonts, personaColorMap } from '../config/theme.config';
 import { appConfig } from '../config/app.config';
+import { JourneyMappingPopup } from '../components/JourneyMappingPopup';
 
 function getPersonaStyle(colorName) {
   const key = (colorName || 'blue').toLowerCase();
   return personaColorMap[key] || personaColorMap.blue;
 }
 
-export function PersonasScreen({ personas, onReview, onBack, onRegenerateJourneys, loadingRegenerate }) {
+export function PersonasScreen({
+  personas,
+  onReview,
+  onBack,
+  onRegenerateJourneys,
+  loadingRegenerate,
+  apiCatalog = {},
+  stepIO = {},
+  onStepIOChange,
+  onRematchStep,
+  onGoToApiMap,
+}) {
   const cfg = appConfig.personasScreen;
+  const [mappingPopupJourney, setMappingPopupJourney] = useState(null);
+  const [mappingPopupPersona, setMappingPopupPersona] = useState(null);
   const totalSteps = personas.reduce((a, p) => a + (p.journeys || []).reduce((b, j) => b + (j.steps || []).length, 0), 0);
+
+  const openMappingPopup = (journey, persona) => {
+    setMappingPopupJourney(journey);
+    setMappingPopupPersona(persona);
+  };
+
+  const closeMappingPopup = () => {
+    setMappingPopupJourney(null);
+    setMappingPopupPersona(null);
+  };
 
   return (
     <div className="fu">
@@ -56,7 +81,25 @@ export function PersonasScreen({ personas, onReview, onBack, onRegenerateJourney
                 </div>
               </div>
               {(persona.journeys || []).map((j) => (
-                <div key={j.id} style={{ padding: '13px 18px', borderBottom: `1px solid ${theme.border}` }}>
+                <div
+                  key={j.id}
+                  onClick={() => openMappingPopup(j, persona)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openMappingPopup(j, persona);
+                    }
+                  }}
+                  style={{
+                    padding: '13px 18px',
+                    borderBottom: `1px solid ${theme.border}`,
+                    cursor: 'pointer',
+                    transition: 'background 0.15s ease',
+                  }}
+                  className="journey-block-clickable"
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
                     <div
                       style={{
@@ -71,6 +114,16 @@ export function PersonasScreen({ personas, onReview, onBack, onRegenerateJourney
                     <div style={{ marginLeft: 'auto', fontSize: 11, color: theme.faint, fontFamily: fonts.mono }}>
                       {(j.steps || []).length} {cfg.stepsLabel}
                     </div>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: theme.blue,
+                        fontFamily: fonts.sans,
+                        marginLeft: 4,
+                      }}
+                    >
+                      View mapping
+                    </span>
                   </div>
                   <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                     {(j.steps || []).map((step) => (
@@ -159,6 +212,21 @@ export function PersonasScreen({ personas, onReview, onBack, onRegenerateJourney
           </button>
         </div>
       </div>
+
+      <JourneyMappingPopup
+        open={!!mappingPopupJourney}
+        onClose={closeMappingPopup}
+        journey={mappingPopupJourney}
+        persona={mappingPopupPersona}
+        stepIO={stepIO}
+        apiCatalog={apiCatalog}
+        onStepIOChange={onStepIOChange}
+        onRematchStep={onRematchStep}
+        onGoToApiMap={() => {
+          closeMappingPopup();
+          onGoToApiMap?.();
+        }}
+      />
     </div>
   );
 }

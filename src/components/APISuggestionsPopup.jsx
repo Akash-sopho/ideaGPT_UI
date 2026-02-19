@@ -8,7 +8,7 @@ const methodColor = {
 };
 
 export function APISuggestionsPopup({
-  apiKey,
+  stepId,
   stepLabel,
   suggestedApis = [],
   enhancements = [],
@@ -26,13 +26,13 @@ export function APISuggestionsPopup({
 
   const handleRefine = () => {
     if (onRerank && additionalInfo.trim()) {
-      onRerank(apiKey, additionalInfo.trim());
+      onRerank(stepId, additionalInfo.trim());
     }
   };
 
   const handleSelect = (item) => {
     if (item?.api && onSelectApi) {
-      onSelectApi(apiKey, item.api);
+      onSelectApi(stepId, item.api);
     }
   };
 

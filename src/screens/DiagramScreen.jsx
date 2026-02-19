@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { theme, fonts, personaColorMap } from '../config/theme.config';
 import { appConfig } from '../config/app.config';
 import { FlowDiagram } from '../components/FlowDiagram';
+import { JourneyMappingPopup } from '../components/JourneyMappingPopup';
 
 function getPersonaStyle(colorName) {
   const key = (colorName || 'blue').toLowerCase();
@@ -11,6 +12,9 @@ function getPersonaStyle(colorName) {
 export function DiagramScreen({
   personas,
   apiCatalog,
+  stepIO = {},
+  onStepIOChange,
+  onRematchStep,
   coveragePct,
   coveredCount,
   allStepsCount,
@@ -22,10 +26,12 @@ export function DiagramScreen({
   onOpenSuggestionsPopup,
   onScrollToJira,
   onRescan,
+  onBackToJourneys,
 }) {
   const cfg = appConfig.diagramScreen || {};
   const [activeTab, setActiveTab] = useState(personas?.[0]?.id || '');
   const [activeJourney, setActiveJourney] = useState({});
+  const [mappingPopupOpen, setMappingPopupOpen] = useState(false);
   const activePersonas = personas || [];
   const currentPersona = activePersonas.find((p) => p.id === activeTab) || activePersonas[0];
   const journeys = currentPersona?.journeys || [];
@@ -41,9 +47,9 @@ export function DiagramScreen({
     onOpenDrawer(api, enhancements);
   };
 
-  const handleOpenSuggestionsPopup = (apiKey, api, enhancements) => {
+  const handleOpenSuggestionsPopup = (stepId, api, enhancements) => {
     if (onOpenSuggestionsPopup) {
-      onOpenSuggestionsPopup(apiKey, api, enhancements);
+      onOpenSuggestionsPopup(stepId, api, enhancements);
     } else {
       onOpenDrawer(api, enhancements);
     }
@@ -98,6 +104,25 @@ export function DiagramScreen({
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, flexShrink: 0, alignItems: 'center' }}>
+          {onBackToJourneys && (
+            <button
+              type="button"
+              onClick={onBackToJourneys}
+              style={{
+                background: theme.surface,
+                border: `1px solid ${theme.border}`,
+                color: theme.muted,
+                borderRadius: 9,
+                padding: '10px 18px',
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: fonts.sans,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Back to Journeys
+            </button>
+          )}
           {onRescan && (
             <button
               type="button"
@@ -191,7 +216,7 @@ export function DiagramScreen({
 
       {currentPersona && (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 22 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 22, alignItems: 'center', flexWrap: 'wrap' }}>
             {(currentPersona.journeys || []).map((j) => (
               <button
                 key={j.id}
@@ -212,6 +237,24 @@ export function DiagramScreen({
                 {j.title}
               </button>
             ))}
+            {currentJourney && (
+              <button
+                type="button"
+                onClick={() => setMappingPopupOpen(true)}
+                style={{
+                  padding: '7px 14px',
+                  background: theme.surface,
+                  color: theme.blue,
+                  border: `1px solid ${theme.blueBorder}`,
+                  borderRadius: 8,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  fontFamily: fonts.sans,
+                }}
+              >
+                View mapping
+              </button>
+            )}
           </div>
           {currentJourney && (
             <div
@@ -256,7 +299,7 @@ export function DiagramScreen({
                     fontFamily: fonts.mono,
                   }}
                 >
-                  {(currentJourney.steps || []).filter((s) => apiCatalog[s.api] && apiCatalog[s.api] !== 'loading' && apiCatalog[s.api].match_status !== 'none').length}/
+                  {(currentJourney.steps || []).filter((s) => apiCatalog[s.id] && apiCatalog[s.id] !== 'loading' && apiCatalog[s.id].match_status !== 'none').length}/
                   {(currentJourney.steps || []).length} {cfg.apisMatched}
                 </div>
               </div>
@@ -267,6 +310,9 @@ export function DiagramScreen({
                   colorBg: getPersonaStyle(currentPersona.color).colorBg,
                 }}
                 apiCatalog={apiCatalog}
+                stepIO={stepIO}
+                onStepIOChange={onStepIOChange}
+                onRematchStep={onRematchStep}
                 onAPIClick={handleOpenSuggestionsPopup}
                 onMissingClick={onScrollToJira}
               />
@@ -315,6 +361,17 @@ export function DiagramScreen({
           </button>
         </div>
       )}
+
+      <JourneyMappingPopup
+        open={mappingPopupOpen}
+        onClose={() => setMappingPopupOpen(false)}
+        journey={currentJourney}
+        persona={currentPersona}
+        stepIO={stepIO}
+        apiCatalog={apiCatalog}
+        onStepIOChange={onStepIOChange}
+        onRematchStep={onRematchStep}
+      />
     </div>
   );
 }

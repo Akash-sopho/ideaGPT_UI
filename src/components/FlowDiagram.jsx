@@ -5,16 +5,28 @@ import { appConfig } from '../config/app.config';
 const NW = 128;
 const GAP = 52;
 
-function getNodeState(apiCatalog, apiKey) {
-  const raw = apiCatalog[apiKey];
+const IOWIDTH = 140;
+
+function getNodeState(apiCatalog, stepId) {
+  const raw = apiCatalog[stepId];
   if (raw === undefined || raw === 'loading') return 'loading';
   if (typeof raw !== 'object') return 'none';
   const status = (raw.match_status || '').toLowerCase();
   if (status === 'exact') return 'exact';
+  if (status === 'partial') return 'partial';
   return 'none';
 }
 
-export function FlowDiagram({ journey, persona, apiCatalog, onAPIClick, onMissingClick }) {
+export function FlowDiagram({
+  journey,
+  persona,
+  apiCatalog,
+  stepIO = {},
+  onStepIOChange,
+  onRematchStep,
+  onAPIClick,
+  onMissingClick,
+}) {
   const steps = journey?.steps || [];
   const cfg = appConfig.diagramScreen || {};
 
@@ -25,16 +37,18 @@ export function FlowDiagram({ journey, persona, apiCatalog, onAPIClick, onMissin
           display: 'flex',
           alignItems: 'flex-start',
           gap: 0,
-          minWidth: steps.length * (NW + GAP) - GAP,
+          minWidth: steps.length * (NW + IOWIDTH) + Math.max(0, steps.length - 1) * GAP,
           position: 'relative',
         }}
       >
         {steps.map((step, i) => {
-          const state = getNodeState(apiCatalog, step.api);
-          const ragResult = typeof apiCatalog[step.api] === 'object' ? apiCatalog[step.api] : null;
+          const state = getNodeState(apiCatalog, step.id);
+          const ragResult = typeof apiCatalog[step.id] === 'object' ? apiCatalog[step.id] : null;
           const api = ragResult?.matched_api || null;
-          const isFound = state === 'exact';
+          const enhancements = ragResult?.enhancements || [];
+          const isFound = state === 'exact' || state === 'partial';
           const isLoading = state === 'loading';
+          const io = stepIO[step.id] || { input: '', output: '' };
 
           let borderColor = theme.redBorder;
           let bgColor = theme.redBg;
@@ -47,20 +61,31 @@ export function FlowDiagram({ journey, persona, apiCatalog, onAPIClick, onMissin
             borderColor = theme.greenBorder;
             bgColor = theme.greenBg;
             badge = 'live';
+          } else if (state === 'partial') {
+            borderColor = theme.amberBorder;
+            bgColor = theme.amberBg;
+            badge = 'enhance';
           }
 
           const handleClick = () => {
             if (isLoading) return;
             if (isFound && api && onAPIClick) {
-              onAPIClick(step.api, api, null);
+              onAPIClick(step.id, api, state === 'partial' ? enhancements : null);
             } else if (state === 'none' && onMissingClick) {
-              onMissingClick(step.api);
+              onMissingClick(step.id);
             }
           };
 
+          const handleInputChange = (e) => {
+            if (onStepIOChange) onStepIOChange(step.id, { ...io, input: e.target.value });
+          };
+          const handleOutputChange = (e) => {
+            if (onStepIOChange) onStepIOChange(step.id, { ...io, output: e.target.value });
+          };
+
           return (
-            <div key={step.id} style={{ display: 'flex', alignItems: 'center', flex: 'none' }}>
-              <div style={{ width: NW, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+            <div key={step.id} style={{ display: 'flex', alignItems: 'flex-start', flex: 'none' }}>
+              <div style={{ width: NW + IOWIDTH, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
                 <div
                   style={{
                     display: 'inline-flex',
@@ -89,6 +114,79 @@ export function FlowDiagram({ journey, persona, apiCatalog, onAPIClick, onMissin
                     {step.label}
                   </span>
                 </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    width: '100%',
+                    gap: 6,
+                    marginBottom: 6,
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 9, color: theme.muted, marginBottom: 2, fontFamily: fonts.sans }}>Input</div>
+                    <textarea
+                      value={io.input}
+                      onChange={handleInputChange}
+                      placeholder="Input schema"
+                      rows={2}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        fontSize: 9,
+                        fontFamily: fonts.mono,
+                        padding: 4,
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: 6,
+                        background: theme.surface,
+                        color: theme.ink,
+                        resize: 'vertical',
+                        minHeight: 36,
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 9, color: theme.muted, marginBottom: 2, fontFamily: fonts.sans }}>Output</div>
+                    <textarea
+                      value={io.output}
+                      onChange={handleOutputChange}
+                      placeholder="Output schema"
+                      rows={2}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        fontSize: 9,
+                        fontFamily: fonts.mono,
+                        padding: 4,
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: 6,
+                        background: theme.surface,
+                        color: theme.ink,
+                        resize: 'vertical',
+                        minHeight: 36,
+                      }}
+                    />
+                  </div>
+                </div>
+                {onRematchStep && (
+                  <button
+                    type="button"
+                    onClick={() => onRematchStep(step.id)}
+                    style={{
+                      fontSize: 9,
+                      marginBottom: 6,
+                      padding: '2px 8px',
+                      fontFamily: fonts.sans,
+                      cursor: 'pointer',
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: 6,
+                      background: theme.alt,
+                      color: theme.muted,
+                    }}
+                  >
+                    Re-match API
+                  </button>
+                )}
                 <div
                   style={{
                     width: 2,
@@ -144,6 +242,35 @@ export function FlowDiagram({ journey, persona, apiCatalog, onAPIClick, onMissin
                         {api.latency || '—'}
                       </div>
                       <Dot status="live" />
+                    </>
+                  )}
+                  {state === 'partial' && api && (
+                    <>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: theme.amber,
+                          fontFamily: fonts.sans,
+                          lineHeight: 1.3,
+                          marginBottom: 3,
+                        }}
+                      >
+                        {api.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: theme.amber + '99',
+                          fontFamily: fonts.mono,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {api.latency || '—'}
+                      </div>
+                      <Dot status="enhance" />
                     </>
                   )}
                   {state === 'none' && (
