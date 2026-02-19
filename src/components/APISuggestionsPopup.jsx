@@ -15,10 +15,13 @@ export function APISuggestionsPopup({
   onClose,
   onRerank,
   onSelectApi,
+  onCreateNewApi,
   loadingRerank = false,
 }) {
   const [additionalInfo, setAdditionalInfo] = useState('');
   const [expandedKey, setExpandedKey] = useState(null);
+  const [showCreateNew, setShowCreateNew] = useState(false);
+  const [newApiName, setNewApiName] = useState('');
 
   const toggleExpanded = (key) => {
     setExpandedKey((prev) => (prev === key ? null : key));
@@ -33,6 +36,13 @@ export function APISuggestionsPopup({
   const handleSelect = (item) => {
     if (item?.api && onSelectApi) {
       onSelectApi(stepId, item.api);
+    }
+  };
+
+  const handleCreateNewSubmit = () => {
+    const trimmed = newApiName.trim();
+    if (trimmed && onCreateNewApi) {
+      onCreateNewApi(stepId, trimmed);
     }
   };
 
@@ -98,7 +108,7 @@ export function APISuggestionsPopup({
                 lineHeight: 1.3,
               }}
             >
-              {stepLabel || apiKey || 'Select an API'}
+              {stepLabel || 'Select an API'}
             </h2>
           </div>
           <button
@@ -378,6 +388,95 @@ export function APISuggestionsPopup({
             )}
           </div>
 
+          {onCreateNewApi && (
+            <div
+              style={{
+                borderTop: `1px solid ${theme.border}`,
+                paddingTop: 16,
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+              }}
+            >
+              {!showCreateNew ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateNew(true)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: theme.alt,
+                    color: theme.muted,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontFamily: fonts.sans,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  None of these — create a new API
+                </button>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <input
+                    type="text"
+                    value={newApiName}
+                    onChange={(e) => setNewApiName(e.target.value)}
+                    placeholder="API name (e.g. my_checkout_service)"
+                    style={{
+                      padding: '10px 14px',
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: 9,
+                      fontSize: 13,
+                      fontFamily: fonts.sans,
+                      color: theme.ink,
+                      background: theme.surface,
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateNewSubmit()}
+                  />
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={handleCreateNewSubmit}
+                      disabled={!newApiName.trim()}
+                      style={{
+                        padding: '10px 18px',
+                        background: theme.navy,
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 9,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: newApiName.trim() ? 'pointer' : 'not-allowed',
+                        fontFamily: fonts.sans,
+                        opacity: newApiName.trim() ? 1 : 0.7,
+                      }}
+                    >
+                      Use new API
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowCreateNew(false); setNewApiName(''); }}
+                      style={{
+                        padding: '10px 14px',
+                        background: 'transparent',
+                        color: theme.muted,
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: 9,
+                        fontSize: 13,
+                        fontFamily: fonts.sans,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

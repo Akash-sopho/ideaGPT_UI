@@ -284,7 +284,7 @@ export function FlowDiagram({
                           marginBottom: 2,
                         }}
                       >
-                        Not Found
+                        {api?.name || 'Not Found'}
                       </div>
                       <div style={{ fontSize: 10, color: theme.red + '88', fontFamily: fonts.mono }}>
                         Needs build

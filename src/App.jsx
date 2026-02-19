@@ -428,10 +428,12 @@ export default function App() {
           journey: journey.title,
           step_label: step.label,
         };
+        // Fallback so we never send empty description (backend requires min_length=1)
+        const description = (desc.description && desc.description.trim()) || step.label || step.api || 'API capability';
         try {
           const result = await ragLookup({
             query_key: step.id,
-            description: desc.description,
+            description,
             context,
             expected_io,
           });
@@ -439,7 +441,7 @@ export default function App() {
             stepId: step.id,
             api_key: step.api,
             result,
-            _query: { description: desc.description, context, expected_io },
+            _query: { description, context, expected_io },
           };
         } catch (err) {
           return {
@@ -451,7 +453,7 @@ export default function App() {
               build_required: true,
               suggested_apis: [],
             },
-            _query: { description: desc.description, context, expected_io },
+            _query: { description, context, expected_io },
           };
         }
       });
@@ -713,10 +715,11 @@ export default function App() {
         .flatMap((p) => p.journeys || [])
         .find((j) => (j.steps || []).some((s) => s.id === stepId));
       setApiCatalog((c) => ({ ...c, [stepId]: 'loading' }));
+      const description = (desc.description && desc.description.trim()) || step.label || step.api || 'API capability';
       try {
         const result = await ragLookup({
           query_key: stepId,
-          description: desc.description,
+          description,
           context: {
             product_idea: idea,
             persona: persona?.label ?? '',
@@ -730,7 +733,7 @@ export default function App() {
           [stepId]: {
             ...result,
             _query: {
-              description: desc.description,
+              description,
               context: { product_idea: idea, persona: persona?.label, journey: journey?.title, step_label: step.label },
               expected_io: { input_schema: io.input, output_schema: io.output },
             },
@@ -798,6 +801,38 @@ export default function App() {
         _query: (c[stepId] || entry)._query,
       },
     }));
+    setSuggestionsPopupStepId(null);
+  }, []);
+
+  const handleCreateNewApi = useCallback((stepId, apiName) => {
+    const newApi = {
+      name: apiName,
+      endpoint: '',
+      method: null,
+      desc: null,
+      team: null,
+      author: null,
+      status: null,
+      version: null,
+      contract: null,
+      sla: null,
+      latency: null,
+      calls: null,
+    };
+    setApiCatalog((c) => {
+      const existing = c[stepId];
+      return {
+        ...c,
+        [stepId]: {
+          ...(typeof existing === 'object' ? existing : {}),
+          match_status: 'none',
+          build_required: true,
+          matched_api: newApi,
+          suggested_apis: [{ api: newApi, score: 0 }],
+          _query: typeof existing === 'object' && existing._query ? existing._query : undefined,
+        },
+      };
+    });
     setSuggestionsPopupStepId(null);
   }, []);
 
@@ -1067,6 +1102,7 @@ export default function App() {
             onClose={() => setSuggestionsPopupStepId(null)}
             onRerank={handleRerank}
             onSelectApi={handleSelectApi}
+            onCreateNewApi={handleCreateNewApi}
             loadingRerank={loadingRerank}
           />
         );
