@@ -20,6 +20,7 @@ export function DiagramScreen({
   onViewJira,
   onOpenDrawer,
   onScrollToJira,
+  onRescan,
 }) {
   const cfg = appConfig.diagramScreen || {};
   const [activeTab, setActiveTab] = useState(personas?.[0]?.id || '');
@@ -87,26 +88,46 @@ export function DiagramScreen({
             {coveredCount} of {allStepsCount} {cfg.coverageSub} · {missingApiKeys.length} {cfg.apisNeedBuild}
           </div>
         </div>
-        {missingJiraKeys.length > 0 && (
-          <button
-            onClick={onViewJira}
-            style={{
-              background: theme.accent,
-              color: '#fff',
-              border: 'none',
-              borderRadius: 9,
-              padding: '10px 18px',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              flexShrink: 0,
-              fontFamily: fonts.sans,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {cfg.viewJiraCta}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0, alignItems: 'center' }}>
+          {onRescan && (
+            <button
+              type="button"
+              onClick={onRescan}
+              style={{
+                background: theme.surface,
+                border: `1px solid ${theme.border}`,
+                color: theme.muted,
+                borderRadius: 9,
+                padding: '10px 18px',
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: fonts.sans,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {cfg.rescanCta || 'Re-scan'}
+            </button>
+          )}
+          {missingJiraKeys.length > 0 && (
+            <button
+              onClick={onViewJira}
+              style={{
+                background: theme.accent,
+                color: '#fff',
+                border: 'none',
+                borderRadius: 9,
+                padding: '10px 18px',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: fonts.sans,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {cfg.viewJiraCta}
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 18, marginBottom: 18, flexWrap: 'wrap' }}>

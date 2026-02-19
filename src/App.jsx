@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { theme, fonts, personaColorMap } from './config/theme.config';
 import { appConfig } from './config/app.config';
 import { scanConfig } from './config/scan.config';
@@ -27,8 +27,14 @@ function getPersonaTheme(colorName) {
   return personaColorMap[key] || personaColorMap.blue;
 }
 
+function getStepIndex(phase) {
+  const idx = appConfig.steps.findIndex((s) => s.phase === phase);
+  return idx >= 0 ? idx : -1;
+}
+
 export default function App() {
   const [phase, setPhase] = useState('idea');
+  const [maxReachedPhase, setMaxReachedPhase] = useState('idea');
   const [idea, setIdea] = useState('');
   const [ideaSummary, setIdeaSummary] = useState('');
   const [features, setFeatures] = useState([]);
@@ -63,6 +69,95 @@ export default function App() {
   const [activeJourney, setActiveJourney] = useState({});
 
   const clearError = (key) => setErrors((e) => ({ ...e, [key]: null }));
+
+  const clearProgressAfter = useCallback((upToPhase) => {
+    switch (upToPhase) {
+      case 'idea':
+        setFeatures([]);
+        setIdeaSummary('');
+        setPersonaSuggestions([]);
+        setConfirmedPersonas([]);
+        setPersonas([]);
+        setUniqueApiKeys([]);
+        setApiCatalog({});
+        setDescriptionCache({});
+        setJiraTickets({});
+        setScanProgress({ total: 0, done: 0, current: '' });
+        setLoadingPersonaSuggestions(false);
+        setLoadingJourneys(false);
+        setLoadingJira(false);
+        setErrors((e) => ({
+          ...e,
+          features: null,
+          personaSuggestions: null,
+          journeys: null,
+          scan: null,
+          jira: null,
+        }));
+        break;
+      case 'features':
+        setPersonaSuggestions([]);
+        setConfirmedPersonas([]);
+        setPersonas([]);
+        setUniqueApiKeys([]);
+        setApiCatalog({});
+        setDescriptionCache({});
+        setJiraTickets({});
+        setScanProgress({ total: 0, done: 0, current: '' });
+        setLoadingPersonaSuggestions(false);
+        setLoadingJourneys(false);
+        setLoadingJira(false);
+        setErrors((e) => ({
+          ...e,
+          personaSuggestions: null,
+          journeys: null,
+          scan: null,
+          jira: null,
+        }));
+        break;
+      case 'persona-suggestion':
+        setPersonas([]);
+        setUniqueApiKeys([]);
+        setApiCatalog({});
+        setDescriptionCache({});
+        setJiraTickets({});
+        setScanProgress({ total: 0, done: 0, current: '' });
+        setLoadingJourneys(false);
+        setLoadingJira(false);
+        setErrors((e) => ({ ...e, journeys: null, scan: null, jira: null }));
+        break;
+      case 'personas':
+      case 'review':
+        setApiCatalog({});
+        setDescriptionCache({});
+        setJiraTickets({});
+        setScanProgress({ total: 0, done: 0, current: '' });
+        setLoadingJira(false);
+        setErrors((e) => ({ ...e, scan: null, jira: null }));
+        break;
+      case 'diagram':
+        setJiraTickets({});
+        setLoadingJira(false);
+        setErrors((e) => ({ ...e, jira: null }));
+        break;
+      case 'jira':
+        setErrors((e) => ({ ...e, jira: null }));
+        break;
+      default:
+        break;
+    }
+    setPhase(upToPhase);
+    setMaxReachedPhase(upToPhase);
+  }, []);
+
+  useEffect(() => {
+    const phaseForMax = phase === 'scanning' ? 'review' : phase;
+    const phaseIdx = getStepIndex(phaseForMax);
+    const maxIdx = getStepIndex(maxReachedPhase);
+    if (phaseIdx > maxIdx) {
+      setMaxReachedPhase(phaseForMax);
+    }
+  }, [phase, maxReachedPhase]);
 
   const handleSendMessage = useCallback(
     async (content) => {
@@ -343,6 +438,91 @@ export default function App() {
     }
   }, [idea, personas, uniqueApiKeys]);
 
+  const handleScan = useCallback(() => {
+    clearProgressAfter('review');
+    doScan();
+  }, [clearProgressAfter, doScan]);
+
+  const handleRegenerateFeatures = useCallback(async () => {
+    clearProgressAfter('features');
+    if (!idea?.trim()) return;
+    setLoadingFeatures(true);
+    setErrors((e) => ({ ...e, features: null }));
+    try {
+      const res = await fetchFeatures(idea);
+      setFeatures(res.features || []);
+      if (res.idea_summary) setIdeaSummary(res.idea_summary);
+    } catch (err) {
+      setErrors((e) => ({ ...e, features: appConfig.errors?.features || 'Could not analyse idea' }));
+    } finally {
+      setLoadingFeatures(false);
+    }
+  }, [idea, clearProgressAfter]);
+
+  const handleRegeneratePersonaSuggestions = useCallback(async () => {
+    clearProgressAfter('persona-suggestion');
+    const selectedFeatures = features.filter((f) => f.on).map((f) => f.title);
+    setLoadingPersonaSuggestions(true);
+    setErrors((e) => ({ ...e, personaSuggestions: null }));
+    try {
+      const res = await suggestPersonas({ idea, ideaSummary, selectedFeatures });
+      const suggestions = (res.personas || []).map((p) => ({
+        ...p,
+        colorBg: getPersonaTheme(p.color).colorBg,
+        colorBorder: getPersonaTheme(p.color).colorBorder,
+        selected: true,
+      }));
+      setPersonaSuggestions(suggestions);
+      setConfirmedPersonas(suggestions);
+    } catch (err) {
+      setErrors((e) => ({ ...e, personaSuggestions: appConfig.errors?.personaSuggestions || 'Could not suggest personas' }));
+    } finally {
+      setLoadingPersonaSuggestions(false);
+    }
+  }, [idea, ideaSummary, features, clearProgressAfter]);
+
+  const handleRegenerateJourneys = useCallback(
+    async () => {
+      clearProgressAfter('personas');
+      const selectedFeatures = features.filter((f) => f.on).map((f) => f.title);
+      const confirmed = (confirmedPersonas || []).map((p) => ({
+        id: p.id,
+        label: p.label,
+        icon: p.icon,
+        desc: p.desc,
+        color: p.color,
+        suggested_journeys: p.suggested_journeys || [],
+      }));
+      if (confirmed.length === 0) return;
+      setLoadingJourneys(true);
+      setErrors((e) => ({ ...e, journeys: null }));
+      try {
+        const res = await generateJourneys({ idea, selectedFeatures, confirmedPersonas: confirmed });
+        const rawPersonas = res.personas || [];
+        const merged = rawPersonas.map((p) => {
+          const confirmedP = confirmed.find((c) => c.id === p.id);
+          const style = getPersonaTheme(confirmedP?.color || p.color);
+          return {
+            ...p,
+            label: confirmedP?.label ?? p.label ?? p.id,
+            icon: confirmedP?.icon ?? p.icon ?? '👤',
+            desc: confirmedP?.desc ?? p.desc ?? '',
+            color: confirmedP?.color ?? p.color ?? 'blue',
+            colorBg: style.colorBg,
+            colorBorder: style.colorBorder,
+          };
+        });
+        setPersonas(merged);
+        setUniqueApiKeys(res.unique_api_keys || []);
+      } catch (err) {
+        setErrors((e) => ({ ...e, journeys: appConfig.errors?.journeys || 'Could not generate journeys' }));
+      } finally {
+        setLoadingJourneys(false);
+      }
+    },
+    [idea, features, confirmedPersonas, clearProgressAfter]
+  );
+
   const allSteps = personas.flatMap((p) => (p.journeys || []).flatMap((j) => (j.steps || [])));
   const covered = allSteps.filter((s) => {
     const r = apiCatalog[s.api];
@@ -447,7 +627,7 @@ export default function App() {
               </div>
             )}
             <button
-              onClick={() => setPhase('idea')}
+              onClick={() => clearProgressAfter('idea')}
               style={{
                 background: theme.surface,
                 border: `1px solid ${theme.border}`,
@@ -471,7 +651,13 @@ export default function App() {
     <div style={{ minHeight: '100vh', background: theme.bg, fontFamily: fonts.sans }}>
       {header}
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px 80px' }}>
-        {phase !== 'idea' && phase !== 'scanning' && <Steps phase={phase} />}
+        {phase !== 'idea' && (
+          <Steps
+            phase={phase}
+            maxReachedPhase={maxReachedPhase}
+            onStepClick={phase === 'scanning' ? undefined : (p) => setPhase(p)}
+          />
+        )}
 
         {phase === 'idea' && (
           <IdeaScreen
@@ -501,6 +687,8 @@ export default function App() {
             loading={loadingPersonaSuggestions}
             error={errors.personaSuggestions}
             onRetry={() => { clearError('personaSuggestions'); handleMapJourneys(); }}
+            onRegenerateFeatures={handleRegenerateFeatures}
+            loadingRegenerate={loadingFeatures}
           />
         )}
 
@@ -512,7 +700,9 @@ export default function App() {
             onConfirm={handleConfirmPersonas}
             loading={loadingJourneys}
             error={errors.journeys}
-            onRetry={() => { clearError('journeys'); setPhase('features'); }}
+            onRetry={() => { clearError('journeys'); handleRegeneratePersonaSuggestions(); }}
+            onRegenerateSuggestions={handleRegeneratePersonaSuggestions}
+            loadingRegenerate={loadingPersonaSuggestions}
           />
         )}
 
@@ -521,6 +711,8 @@ export default function App() {
             personas={personas}
             onReview={() => setPhase('review')}
             onBack={() => setPhase('persona-suggestion')}
+            onRegenerateJourneys={handleRegenerateJourneys}
+            loadingRegenerate={loadingJourneys}
           />
         )}
 
@@ -529,7 +721,7 @@ export default function App() {
             idea={idea}
             features={features}
             personas={personas}
-            onScan={doScan}
+            onScan={handleScan}
             onBack={() => setPhase('personas')}
           />
         )}
@@ -558,6 +750,7 @@ export default function App() {
             onViewJira={() => setPhase('jira')}
             onOpenDrawer={openDrawer}
             onScrollToJira={() => setPhase('jira')}
+            onRescan={handleScan}
           />
         )}
 
@@ -567,6 +760,7 @@ export default function App() {
             missingApiKeys={missingJiraKeys}
             onBackToDiagram={() => setPhase('diagram')}
             onPushToJira={() => {}}
+            onRescan={handleScan}
           />
         )}
       </div>

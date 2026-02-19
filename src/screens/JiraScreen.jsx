@@ -19,6 +19,7 @@ export function JiraScreen({
   onPushToJira,
   onRetryJira,
   loadingJira,
+  onRescan,
 }) {
   const cfg = appConfig.jiraScreen;
   const [openJira, setOpenJira] = useState(null);
@@ -49,22 +50,42 @@ export function JiraScreen({
           </h2>
           <p style={{ color: theme.muted, fontSize: 14, margin: 0 }}>{cfg.subtitle}</p>
         </div>
-        <button
-          onClick={onBackToDiagram}
-          style={{
-            background: theme.surface,
-            border: `1px solid ${theme.border}`,
-            color: theme.muted,
-            borderRadius: 9,
-            padding: '9px 18px',
-            fontSize: 13,
-            cursor: 'pointer',
-            flexShrink: 0,
-            fontFamily: fonts.sans,
-          }}
-        >
-          {cfg.backToDiagram}
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+          {onRescan && (
+            <button
+              type="button"
+              onClick={onRescan}
+              style={{
+                background: theme.surface,
+                border: `1px solid ${theme.border}`,
+                color: theme.muted,
+                borderRadius: 9,
+                padding: '9px 18px',
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: fonts.sans,
+              }}
+            >
+              {cfg.rescanCta || 'Re-scan'}
+            </button>
+          )}
+          <button
+            onClick={onBackToDiagram}
+            style={{
+              background: theme.surface,
+              border: `1px solid ${theme.border}`,
+              color: theme.muted,
+              borderRadius: 9,
+              padding: '9px 18px',
+              fontSize: 13,
+              cursor: 'pointer',
+              flexShrink: 0,
+              fontFamily: fonts.sans,
+            }}
+          >
+            {cfg.backToDiagram}
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 26 }}>

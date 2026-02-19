@@ -6,7 +6,7 @@ function getPersonaStyle(colorName) {
   return personaColorMap[key] || personaColorMap.blue;
 }
 
-export function PersonasScreen({ personas, onReview, onBack }) {
+export function PersonasScreen({ personas, onReview, onBack, onRegenerateJourneys, loadingRegenerate }) {
   const cfg = appConfig.personasScreen;
   const totalSteps = personas.reduce((a, p) => a + (p.journeys || []).reduce((b, j) => b + (j.steps || []).length, 0), 0);
 
@@ -99,22 +99,43 @@ export function PersonasScreen({ personas, onReview, onBack }) {
           );
         })}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button
-          onClick={onBack}
-          style={{
-            background: theme.surface,
-            border: `1px solid ${theme.border}`,
-            color: theme.muted,
-            borderRadius: 10,
-            padding: '10px 20px',
-            fontSize: 14,
-            cursor: 'pointer',
-            fontFamily: fonts.sans,
-          }}
-        >
-          {cfg.back}
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button
+            onClick={onBack}
+            style={{
+              background: theme.surface,
+              border: `1px solid ${theme.border}`,
+              color: theme.muted,
+              borderRadius: 10,
+              padding: '10px 20px',
+              fontSize: 14,
+              cursor: 'pointer',
+              fontFamily: fonts.sans,
+            }}
+          >
+            {cfg.back}
+          </button>
+          {onRegenerateJourneys && (
+            <button
+              type="button"
+              onClick={onRegenerateJourneys}
+              disabled={loadingRegenerate}
+              style={{
+                background: theme.surface,
+                border: `1px solid ${theme.border}`,
+                color: theme.muted,
+                borderRadius: 10,
+                padding: '10px 20px',
+                fontSize: 14,
+                cursor: loadingRegenerate ? 'not-allowed' : 'pointer',
+                fontFamily: fonts.sans,
+              }}
+            >
+              {loadingRegenerate ? 'Regenerating…' : (cfg.regenerateCta || 'Regenerate journeys')}
+            </button>
+          )}
+        </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div style={{ color: theme.muted, fontSize: 13 }}>
             <strong style={{ color: theme.ink }}>{personas.length}</strong> {cfg.personasLabel} ·{' '}

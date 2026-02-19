@@ -17,6 +17,8 @@ export function PersonaSuggestionScreen({
   loading,
   error,
   onRetry,
+  onRegenerateSuggestions,
+  loadingRegenerate,
 }) {
   const cfg = appConfig.personaSuggestionScreen;
   const list = confirmedPersonas.length ? confirmedPersonas : personaSuggestions.map((p) => ({
@@ -253,22 +255,43 @@ export function PersonaSuggestionScreen({
         })}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <button
-          type="button"
-          onClick={addCustom}
-          style={{
-            background: theme.surface,
-            border: `1px dashed ${theme.border}`,
-            color: theme.muted,
-            borderRadius: 10,
-            padding: '10px 20px',
-            fontSize: 14,
-            cursor: 'pointer',
-            fontFamily: fonts.sans,
-          }}
-        >
-          + {cfg.addCustom}
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={addCustom}
+            style={{
+              background: theme.surface,
+              border: `1px dashed ${theme.border}`,
+              color: theme.muted,
+              borderRadius: 10,
+              padding: '10px 20px',
+              fontSize: 14,
+              cursor: 'pointer',
+              fontFamily: fonts.sans,
+            }}
+          >
+            + {cfg.addCustom}
+          </button>
+          {onRegenerateSuggestions && (
+            <button
+              type="button"
+              onClick={onRegenerateSuggestions}
+              disabled={loading || loadingRegenerate}
+              style={{
+                background: theme.surface,
+                border: `1px solid ${theme.border}`,
+                color: theme.muted,
+                borderRadius: 10,
+                padding: '10px 20px',
+                fontSize: 14,
+                cursor: loading || loadingRegenerate ? 'not-allowed' : 'pointer',
+                fontFamily: fonts.sans,
+              }}
+            >
+              {loadingRegenerate ? 'Regenerating…' : (cfg.regenerateCta || 'Regenerate suggestions')}
+            </button>
+          )}
+        </div>
         <button
           onClick={handleConfirm}
           disabled={loading || list.filter((p) => p.selected).length < 1}

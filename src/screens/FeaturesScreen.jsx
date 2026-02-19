@@ -1,7 +1,7 @@
 import { theme, fonts } from '../config/theme.config';
 import { appConfig } from '../config/app.config';
 
-export function FeaturesScreen({ idea, features, setFeatures, onMapJourneys, loading, error, onRetry }) {
+export function FeaturesScreen({ idea, features, setFeatures, onMapJourneys, loading, error, onRetry, onRegenerateFeatures, loadingRegenerate }) {
   const cfg = appConfig.featuresScreen;
   const selected = features.filter((f) => f.on).length;
 
@@ -118,9 +118,30 @@ export function FeaturesScreen({ idea, features, setFeatures, onMapJourneys, loa
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ color: theme.muted, fontSize: 13 }}>
-          <strong style={{ color: theme.ink }}>{selected}</strong> {cfg.of} {features.length} {cfg.featuresSelected}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ color: theme.muted, fontSize: 13 }}>
+            <strong style={{ color: theme.ink }}>{selected}</strong> {cfg.of} {features.length} {cfg.featuresSelected}
+          </div>
+          {onRegenerateFeatures && (
+            <button
+              type="button"
+              onClick={onRegenerateFeatures}
+              disabled={loading || loadingRegenerate}
+              style={{
+                background: theme.surface,
+                border: `1px solid ${theme.border}`,
+                color: theme.muted,
+                borderRadius: 8,
+                padding: '8px 16px',
+                fontSize: 12,
+                cursor: loading || loadingRegenerate ? 'not-allowed' : 'pointer',
+                fontFamily: fonts.sans,
+              }}
+            >
+              {loadingRegenerate ? 'Regenerating…' : (cfg.regenerateCta || 'Regenerate features')}
+            </button>
+          )}
         </div>
         <button
           onClick={onMapJourneys}

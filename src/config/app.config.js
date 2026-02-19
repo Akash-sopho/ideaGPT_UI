@@ -52,6 +52,7 @@ export const appConfig = {
     mapJourneysCta: 'Map User Journeys →',
     selectedCount: 'of',
     featuresSelected: 'features selected',
+    regenerateCta: 'Regenerate features',
   },
   personaSuggestionScreen: {
     stepLabel: 'STEP 2 — PERSONA SUGGESTION',
@@ -60,6 +61,7 @@ export const appConfig = {
     confirmCta: 'Confirm Personas →',
     addCustom: 'Add custom persona',
     primaryBadge: 'Primary',
+    regenerateCta: 'Regenerate suggestions',
   },
   personasScreen: {
     stepLabel: 'STEP 2 — USER JOURNEY MAPPING',
@@ -69,6 +71,7 @@ export const appConfig = {
     stepsLabel: 'steps',
     back: '← Back',
     personasLabel: 'personas',
+    regenerateCta: 'Regenerate journeys',
   },
   reviewScreen: {
     stepLabel: 'STEP 3 — FINAL REVIEW',
@@ -98,6 +101,7 @@ export const appConfig = {
     needsBuildBannerTitle: 'API(s) need to be built — estimated',
     needsBuildBannerSub: 'man-days total',
     needsBuildBannerBody: 'Auto-generated Jira stories with effort estimates are ready.',
+    rescanCta: 'Re-scan',
   },
   jiraScreen: {
     stepLabel: 'DEVELOPMENT PLAN',
@@ -121,6 +125,7 @@ export const appConfig = {
     sprints: 'sprints',
     totalEstimateSub: 'Assuming 2-week sprints with a squad of 3–4 engineers',
     generationFailed: 'Generation failed — retry',
+    rescanCta: 'Re-scan',
   },
   header: {
     appName: 'IdeaGPT',
