@@ -58,7 +58,7 @@ export function FlowDiagram({ journey, persona, apiCatalog, onAPIClick, onMissin
           const handleClick = () => {
             if (isLoading) return;
             if (isFound && api && onAPIClick) {
-              onAPIClick(api, state === 'partial' ? enhancements : null);
+              onAPIClick(step.api, api, state === 'partial' ? enhancements : null);
             } else if (state === 'none' && onMissingClick) {
               onMissingClick(step.api);
             }

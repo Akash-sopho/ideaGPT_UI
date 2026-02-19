@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { theme, fonts, personaColorMap } from './config/theme.config';
 import { appConfig } from './config/app.config';
 import { scanConfig } from './config/scan.config';
@@ -7,10 +7,11 @@ import { sendChat, summariseIdea } from './api/chat';
 import { suggestPersonas } from './api/personas';
 import { generateJourneys } from './api/journeys';
 import { describeApiKey } from './api/describe';
-import { ragLookup } from './api/rag';
+import { ragLookup, ragRerank } from './api/rag';
 import { generateJiraTicket } from './api/jira';
 import { Steps } from './components/Steps';
 import { Drawer } from './components/Drawer';
+import { APISuggestionsPopup } from './components/APISuggestionsPopup';
 import { IdeaScreen } from './screens/IdeaScreen';
 import { FeaturesScreen } from './screens/FeaturesScreen';
 import { PersonaSuggestionScreen } from './screens/PersonaSuggestionScreen';
@@ -65,8 +66,12 @@ export default function App() {
   });
   const [drawerAPI, setDrawerAPI] = useState(null);
   const [drawerEnhancements, setDrawerEnhancements] = useState(null);
+  const [suggestionsPopupApiKey, setSuggestionsPopupApiKey] = useState(null);
+  const [loadingRerank, setLoadingRerank] = useState(false);
   const [activeTab, setActiveTab] = useState('');
   const [activeJourney, setActiveJourney] = useState({});
+  const apiCatalogRef = useRef(apiCatalog);
+  apiCatalogRef.current = apiCatalog;
 
   const clearError = (key) => setErrors((e) => ({ ...e, [key]: null }));
 
@@ -355,31 +360,41 @@ export default function App() {
       const ragPromises = keys.map(async (api_key) => {
         const desc = localDescCache[api_key] || {};
         const ctx = stepContextByKey[api_key] || {};
+        const context = {
+          product_idea: idea,
+          persona: ctx.persona_label,
+          journey: ctx.journey_title,
+          step_label: ctx.step_label,
+        };
+        const expected_io = {
+          input_schema: desc.input_schema,
+          output_schema: desc.output_schema,
+        };
         try {
           const result = await ragLookup({
             query_key: api_key,
             description: desc.description,
-            context: {
-              product_idea: idea,
-              persona: ctx.persona_label,
-              journey: ctx.journey_title,
-              step_label: ctx.step_label,
-            },
-            expected_io: {
-              input_schema: desc.input_schema,
-              output_schema: desc.output_schema,
-            },
+            context,
+            expected_io,
           });
-          return { api_key, result };
+          return {
+            api_key,
+            result,
+            _query: { description: desc.description, context, expected_io },
+          };
         } catch (err) {
-          return { api_key, result: { query_key: api_key, match_status: 'none', build_required: true } };
+          return {
+            api_key,
+            result: { query_key: api_key, match_status: 'none', build_required: true, suggested_apis: [] },
+            _query: { description: desc.description, context, expected_io },
+          };
         }
       });
 
       const ragResults = await Promise.all(ragPromises);
       const catalogUpdate = {};
-      ragResults.forEach(({ api_key, result }) => {
-        catalogUpdate[api_key] = result;
+      ragResults.forEach(({ api_key, result, _query }) => {
+        catalogUpdate[api_key] = { ...result, _query };
       });
       setApiCatalog((c) => ({ ...c, ...catalogUpdate }));
       setScanProgress((p) => ({ ...p, done: p.total, current: messages[messages.length - 1] || p.current }));
@@ -541,6 +556,59 @@ export default function App() {
     setDrawerAPI(api);
     setDrawerEnhancements(enhancements || null);
   };
+
+  const openSuggestionsPopup = (apiKey, api, enhancements) => {
+    setSuggestionsPopupApiKey(apiKey);
+  };
+
+  const handleRerank = useCallback(async (apiKey, additionalInfo) => {
+    const entry = apiCatalogRef.current[apiKey];
+    if (!entry || typeof entry !== 'object' || !entry._query) return;
+    const { description, context, expected_io } = entry._query;
+    const suggested_apis = entry.suggested_apis || [];
+    if (suggested_apis.length === 0) return;
+    setLoadingRerank(true);
+    try {
+      const res = await ragRerank({
+        query_key: apiKey,
+        description,
+        context,
+        expected_io,
+        additional_info: additionalInfo,
+        suggested_apis,
+      });
+      const newList = res.suggested_apis || [];
+      const newFirst = newList[0]?.api || null;
+      setApiCatalog((c) => ({
+        ...c,
+        [apiKey]: {
+          ...(c[apiKey] || {}),
+          suggested_apis: newList,
+          matched_api: newFirst,
+          confidence_score: newList[0]?.score ?? (c[apiKey]?.confidence_score ?? 0),
+          _query: (c[apiKey] || entry)._query,
+        },
+      }));
+    } finally {
+      setLoadingRerank(false);
+    }
+  }, []);
+
+  const handleSelectApi = useCallback((apiKey, api) => {
+    const entry = apiCatalogRef.current[apiKey];
+    if (!entry || typeof entry !== 'object') return;
+    const single = [{ api, score: entry.confidence_score ?? 1 }];
+    setApiCatalog((c) => ({
+      ...c,
+      [apiKey]: {
+        ...(c[apiKey] || entry),
+        matched_api: api,
+        suggested_apis: single,
+        _query: (c[apiKey] || entry)._query,
+      },
+    }));
+    setSuggestionsPopupApiKey(null);
+  }, []);
 
   const header = (
     <div
@@ -753,6 +821,7 @@ export default function App() {
             totalDays={totalDays}
             onViewJira={() => setPhase('jira')}
             onOpenDrawer={openDrawer}
+            onOpenSuggestionsPopup={openSuggestionsPopup}
             onScrollToJira={() => setPhase('jira')}
             onRescan={handleScan}
           />
@@ -776,6 +845,39 @@ export default function App() {
           setDrawerEnhancements(null);
         }}
       />
+      {suggestionsPopupApiKey && (() => {
+        const entry = apiCatalog[suggestionsPopupApiKey];
+        const raw = entry && typeof entry === 'object' ? (entry.suggested_apis || []) : [];
+        const suggestedApis =
+          raw.length > 0
+            ? raw
+            : entry?.matched_api
+              ? [{ api: entry.matched_api, score: entry.confidence_score ?? 0 }]
+              : [];
+        const enhancements = entry && typeof entry === 'object' ? (entry.enhancements || []) : [];
+        let stepLabel = suggestionsPopupApiKey;
+        for (const p of personas || []) {
+          for (const j of p.journeys || []) {
+            const step = (j.steps || []).find((s) => s.api === suggestionsPopupApiKey);
+            if (step) {
+              stepLabel = step.label;
+              break;
+            }
+          }
+        }
+        return (
+          <APISuggestionsPopup
+            apiKey={suggestionsPopupApiKey}
+            stepLabel={stepLabel}
+            suggestedApis={suggestedApis}
+            enhancements={enhancements}
+            onClose={() => setSuggestionsPopupApiKey(null)}
+            onRerank={handleRerank}
+            onSelectApi={handleSelectApi}
+            loadingRerank={loadingRerank}
+          />
+        );
+      })()}
     </div>
   );
 }

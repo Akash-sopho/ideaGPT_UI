@@ -12,5 +12,6 @@ export const scanConfig = {
   ],
   batchSize: 10,
   ragTimeoutMs: 8000,
-  topK: 3,
+  topK: 50,
+  minScore: 0.75,
 };

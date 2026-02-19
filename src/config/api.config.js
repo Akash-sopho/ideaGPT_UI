@@ -10,4 +10,5 @@ export const apiPaths = {
   describe: '/llm/describe',
   jira: '/llm/jira',
   ragLookup: '/api/rag/lookup',
+  ragRerank: '/api/rag/rerank',
 };

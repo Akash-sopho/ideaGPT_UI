@@ -19,6 +19,7 @@ export function DiagramScreen({
   totalDays,
   onViewJira,
   onOpenDrawer,
+  onOpenSuggestionsPopup,
   onScrollToJira,
   onRescan,
 }) {
@@ -38,6 +39,14 @@ export function DiagramScreen({
 
   const handleOpenDrawer = (api, enhancements) => {
     onOpenDrawer(api, enhancements);
+  };
+
+  const handleOpenSuggestionsPopup = (apiKey, api, enhancements) => {
+    if (onOpenSuggestionsPopup) {
+      onOpenSuggestionsPopup(apiKey, api, enhancements);
+    } else {
+      onOpenDrawer(api, enhancements);
+    }
   };
 
   return (
@@ -259,7 +268,7 @@ export function DiagramScreen({
                   colorBg: getPersonaStyle(currentPersona.color).colorBg,
                 }}
                 apiCatalog={apiCatalog}
-                onAPIClick={handleOpenDrawer}
+                onAPIClick={handleOpenSuggestionsPopup}
                 onMissingClick={onScrollToJira}
               />
             </div>
