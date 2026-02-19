@@ -7,6 +7,7 @@ import { sendChat, summariseIdea } from './api/chat';
 import { suggestPersonas } from './api/personas';
 import { generateJourneys } from './api/journeys';
 import { describeApiKey } from './api/describe';
+import { getStepIO } from './api/stepIo';
 import { ragLookup, ragRerank } from './api/rag';
 import { generateJiraTicket } from './api/jira';
 import { Steps } from './components/Steps';
@@ -31,6 +32,84 @@ function getPersonaTheme(colorName) {
 function getStepIndex(phase) {
   const idx = appConfig.steps.findIndex((s) => s.phase === phase);
   return idx >= 0 ? idx : -1;
+}
+
+/** Fetches describe results per api_key (description only for RAG) and step I/O from direct LLM per step. No chaining. */
+async function fetchDescriptionsAndStepIO(personas, idea, keys) {
+  if (!keys || keys.length === 0) return { localDescCache: {}, stepIOUpdate: {} };
+  const stepContextByKey = {};
+  personas.forEach((persona) => {
+    (persona.journeys || []).forEach((journey) => {
+      (journey.steps || []).forEach((step) => {
+        if (step.api && !stepContextByKey[step.api]) {
+          stepContextByKey[step.api] = {
+            step_label: step.label,
+            persona_label: persona.label,
+            journey_title: journey.title,
+          };
+        }
+      });
+    });
+  });
+  const batchSize = scanConfig.batchSize || 10;
+  const localDescCache = {};
+  for (let i = 0; i < keys.length; i += batchSize) {
+    const batch = keys.slice(i, i + batchSize);
+    const describePromises = batch.map((api_key) => {
+      const ctx = stepContextByKey[api_key] || {};
+      return describeApiKey({
+        api_key,
+        idea,
+        step_label: ctx.step_label,
+        persona_label: ctx.persona_label,
+        journey_title: ctx.journey_title,
+      });
+    });
+    const results = await Promise.all(describePromises);
+    results.forEach((r) => {
+      if (r && r.api_key) {
+        localDescCache[r.api_key] = {
+          description: r.description,
+          input_schema: r.input_schema,
+          output_schema: r.output_schema,
+        };
+      }
+    });
+  }
+  const stepIOUpdate = {};
+  const allSteps = [];
+  personas.forEach((persona) => {
+    (persona.journeys || []).forEach((journey) => {
+      (journey.steps || []).forEach((step) => {
+        allSteps.push({
+          step,
+          persona_label: persona.label,
+          journey_title: journey.title,
+        });
+      });
+    });
+  });
+  for (let i = 0; i < allSteps.length; i += batchSize) {
+    const batch = allSteps.slice(i, i + batchSize);
+    const stepIOPromises = batch.map(({ step, persona_label, journey_title }) =>
+      getStepIO({
+        idea,
+        persona_label,
+        journey_title,
+        step_label: step.label,
+        api_key: step.api || '',
+      })
+    );
+    const stepIOResults = await Promise.all(stepIOPromises);
+    batch.forEach(({ step }, idx) => {
+      const res = stepIOResults[idx];
+      stepIOUpdate[step.id] = {
+        input: (res && res.input_schema) || '',
+        output: (res && res.output_schema) || '',
+      };
+    });
+  }
+  return { localDescCache, stepIOUpdate };
 }
 
 export default function App() {
@@ -69,10 +148,12 @@ export default function App() {
   const [stepIO, setStepIO] = useState({});
   const [suggestionsPopupStepId, setSuggestionsPopupStepId] = useState(null);
   const [loadingRerank, setLoadingRerank] = useState(false);
+  const [loadingDescribeForPersonas, setLoadingDescribeForPersonas] = useState(false);
   const [activeTab, setActiveTab] = useState('');
   const [activeJourney, setActiveJourney] = useState({});
   const apiCatalogRef = useRef(apiCatalog);
   apiCatalogRef.current = apiCatalog;
+  const describeCancelRef = useRef(false);
 
   const clearError = (key) => setErrors((e) => ({ ...e, [key]: null }));
 
@@ -308,58 +389,13 @@ export default function App() {
       return;
     }
 
-    const stepContextByKey = {};
-    personas.forEach((persona) => {
-      (persona.journeys || []).forEach((journey) => {
-        (journey.steps || []).forEach((step) => {
-          if (step.api && !stepContextByKey[step.api]) {
-            stepContextByKey[step.api] = {
-              step_label: step.label,
-              persona_label: persona.label,
-              journey_title: journey.title,
-            };
-          }
-        });
-      });
-    });
-
-    const batchSize = scanConfig.batchSize || 10;
     const messages = scanConfig.loadingMessages || [];
-
     setScanProgress({ total: keys.length, done: 0, current: messages[0] });
 
-    const localDescCache = {};
-
     try {
-      for (let i = 0; i < keys.length; i += batchSize) {
-        const batch = keys.slice(i, i + batchSize);
-        const describePromises = batch.map((api_key) => {
-          const ctx = stepContextByKey[api_key] || {};
-          return describeApiKey({
-            api_key,
-            idea,
-            step_label: ctx.step_label,
-            persona_label: ctx.persona_label,
-            journey_title: ctx.journey_title,
-          });
-        });
-        const results = await Promise.all(describePromises);
-        results.forEach((r) => {
-          if (r && r.api_key) {
-            localDescCache[r.api_key] = {
-              description: r.description,
-              input_schema: r.input_schema,
-              output_schema: r.output_schema,
-            };
-          }
-        });
-        setDescriptionCache((prev) => ({ ...prev, ...localDescCache }));
-        setScanProgress((p) => ({
-          ...p,
-          done: p.done + batch.length,
-          current: messages[Math.min(Math.floor((p.done + batch.length) / keys.length * messages.length), messages.length - 1)],
-        }));
-      }
+      const { localDescCache, stepIOUpdate } = await fetchDescriptionsAndStepIO(personas, idea, keys);
+      setDescriptionCache((prev) => ({ ...prev, ...localDescCache }));
+      setStepIO((prev) => ({ ...prev, ...stepIOUpdate }));
 
       const allStepsForRag = [];
       personas.forEach((persona) => {
@@ -369,29 +405,6 @@ export default function App() {
           });
         });
       });
-
-      const stepIOUpdate = {};
-      personas.forEach((persona) => {
-        (persona.journeys || []).forEach((journey) => {
-          const steps = journey.steps || [];
-          steps.forEach((step, i) => {
-            const desc = localDescCache[step.api] || {};
-            if (i === 0) {
-              stepIOUpdate[step.id] = {
-                input: desc.input_schema || '',
-                output: desc.output_schema || '',
-              };
-            } else {
-              const prev = steps[i - 1];
-              stepIOUpdate[step.id] = {
-                input: stepIOUpdate[prev.id]?.output ?? '',
-                output: desc.output_schema || '',
-              };
-            }
-          });
-        });
-      });
-      setStepIO((prev) => ({ ...prev, ...stepIOUpdate }));
 
       allStepsForRag.forEach(({ step }) => {
         setApiCatalog((c) => ({ ...c, [step.id]: 'loading' }));
@@ -519,6 +532,45 @@ export default function App() {
     clearProgressAfter('review');
     doScan();
   }, [clearProgressAfter, doScan]);
+
+  // Populate stepIO (input/output schema) when user reaches Journeys screen so the mapping popup shows schemas without running API Map first.
+  useEffect(() => {
+    const allSteps = personas.flatMap((p) => (p.journeys || []).flatMap((j) => (j.steps || [])));
+    const stepIOPopulated = allSteps.length > 0 && allSteps.every((s) => stepIO[s.id] != null);
+    if (
+      phase !== 'personas' ||
+      personas.length === 0 ||
+      uniqueApiKeys.length === 0 ||
+      stepIOPopulated
+    ) {
+      return;
+    }
+    describeCancelRef.current = false;
+    setLoadingDescribeForPersonas(true);
+    (async () => {
+      try {
+        const { localDescCache, stepIOUpdate } = await fetchDescriptionsAndStepIO(
+          personas,
+          idea,
+          uniqueApiKeys
+        );
+        if (!describeCancelRef.current) {
+          setDescriptionCache((prev) => ({ ...prev, ...localDescCache }));
+          setStepIO((prev) => ({ ...prev, ...stepIOUpdate }));
+        }
+      } catch {
+        // Ignore: user can still open popup and run API Map later to get schemas.
+      } finally {
+        if (!describeCancelRef.current) {
+          setLoadingDescribeForPersonas(false);
+        }
+      }
+    })();
+    return () => {
+      describeCancelRef.current = true;
+      setLoadingDescribeForPersonas(false);
+    };
+  }, [phase, personas, idea, uniqueApiKeys, stepIO]);
 
   const handleRegenerateFeatures = useCallback(async () => {
     clearProgressAfter('features');
@@ -929,6 +981,7 @@ export default function App() {
             onStepIOChange={handleStepIOChange}
             onRematchStep={handleRematchStep}
             onGoToApiMap={() => setPhase('review')}
+            loadingDescribeForPersonas={loadingDescribeForPersonas}
           />
         )}
 

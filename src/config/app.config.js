@@ -15,7 +15,7 @@ export const appConfig = {
   maxFeatures: 12,
   minPersonas: 2,
   maxPersonas: 4,
-  stepsPerJourney: 5,
+  stepsPerJourney: 5,       // target per journey; backend allows 1-7
   journeysPerPersona: 2,
   ideaPlaceholder: 'e.g. A mobile-first e-commerce app with personalised shopping, one-click checkout and a loyalty rewards programme…',
   exampleIdeas: [

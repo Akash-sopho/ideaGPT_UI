@@ -21,6 +21,7 @@ export function JourneyMappingPopup({
   onStepIOChange,
   onRematchStep,
   onGoToApiMap,
+  loadingDescribeForPersonas = false,
 }) {
   if (!open) return null;
 
@@ -180,6 +181,8 @@ export function JourneyMappingPopup({
                 catalogEntry && typeof catalogEntry === 'object'
                   ? catalogEntry.matched_api
                   : null;
+              const schemaLoading =
+                loadingDescribeForPersonas && !io.input && !io.output;
 
               return (
                 <div
@@ -270,7 +273,7 @@ export function JourneyMappingPopup({
                         onChange={(e) =>
                           onStepIOChange?.(step.id, { ...io, input: e.target.value })
                         }
-                        placeholder="Input schema"
+                        placeholder={schemaLoading ? 'Loading schemas…' : 'Input schema'}
                         rows={2}
                         style={{
                           width: '100%',
@@ -304,7 +307,7 @@ export function JourneyMappingPopup({
                         onChange={(e) =>
                           onStepIOChange?.(step.id, { ...io, output: e.target.value })
                         }
-                        placeholder="Output schema"
+                        placeholder={schemaLoading ? 'Loading schemas…' : 'Output schema'}
                         rows={2}
                         style={{
                           width: '100%',

@@ -8,6 +8,7 @@ export const apiPaths = {
   suggestPersonas: '/llm/suggest-personas',
   generateJourneys: '/llm/generate-journeys',
   describe: '/llm/describe',
+  stepIo: '/llm/step-io',
   jira: '/llm/jira',
   ragLookup: '/api/rag/lookup',
   ragRerank: '/api/rag/rerank',

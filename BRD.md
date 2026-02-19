@@ -331,7 +331,7 @@ class GenerateJourneysRequest(BaseModel):
     idea: str
     selected_features: List[str]    # Feature titles where on=True.
     confirmed_personas: List[ConfirmedPersona]
-    steps_per_journey: int = 5      # Target steps per journey (4-7).
+    steps_per_journey: int = 5      # Target steps per journey (1-7).
     journeys_per_persona: int = 2   # Target journeys per persona (1-3).
 ```
 
@@ -349,7 +349,7 @@ class JourneyStep(BaseModel):
 class Journey(BaseModel):
     id: str
     title: str                      # 3-5 word journey name.
-    steps: List[JourneyStep]        # 4-7 steps.
+    steps: List[JourneyStep]        # 1-7 steps.
 
 class PersonaWithJourneys(BaseModel):
     id: str                         # Matches ConfirmedPersona.id.

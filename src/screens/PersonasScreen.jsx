@@ -19,6 +19,7 @@ export function PersonasScreen({
   onStepIOChange,
   onRematchStep,
   onGoToApiMap,
+  loadingDescribeForPersonas = false,
 }) {
   const cfg = appConfig.personasScreen;
   const [mappingPopupJourney, setMappingPopupJourney] = useState(null);
@@ -226,6 +227,7 @@ export function PersonasScreen({
           closeMappingPopup();
           onGoToApiMap?.();
         }}
+        loadingDescribeForPersonas={loadingDescribeForPersonas}
       />
     </div>
   );
