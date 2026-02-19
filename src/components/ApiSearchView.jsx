@@ -277,7 +277,6 @@ export function ApiSearchView() {
           const endpoint = api.endpoint || api.path || '';
           const score = api.score;
           const matchType = api.match_type;
-          const enhancementSuggestion = api.enhancement_suggestion;
           const tags = api.tags || [];
           const domain = api.domain;
           const team = api.team;
@@ -353,23 +352,6 @@ export function ApiSearchView() {
                       {t}
                     </span>
                   ))}
-                </div>
-              )}
-              {enhancementSuggestion && (
-                <div
-                  style={{
-                    marginTop: 10,
-                    padding: 10,
-                    background: theme.amberBg,
-                    border: `1px solid ${theme.amberBorder}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    color: theme.ink,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  <strong style={{ fontSize: 12, color: theme.amber }}>Suggestion: </strong>
-                  {enhancementSuggestion}
                 </div>
               )}
             </div>

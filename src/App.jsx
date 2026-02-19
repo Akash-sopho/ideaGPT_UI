@@ -174,7 +174,8 @@ export default function App() {
       setLoadingChat(true);
       setErrors((e) => ({ ...e, chat: null }));
       try {
-        const res = await sendChat({ messages: nextMessages, idea_context: idea });
+        const ideaContext = idea.trim() || (nextMessages.find((m) => m.role === 'user')?.content?.trim() ?? '');
+        const res = await sendChat({ messages: nextMessages, idea_context: ideaContext });
         setChatMessages((prev) => [...prev, { role: 'assistant', content: res.reply || '' }]);
       } catch (err) {
         setErrors((e) => ({ ...e, chat: appConfig.ideaScreen?.errors?.chat || appConfig.errors?.chat || 'Could not send message' }));
@@ -654,7 +655,7 @@ export default function App() {
               letterSpacing: -0.3,
             }}
           >
-            {appConfig.header?.appName || 'IdeaGPT'}
+            {appConfig.header?.appName || 'API Atlas'}
           </span>
           <span
             style={{

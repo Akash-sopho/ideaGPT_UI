@@ -11,7 +11,6 @@ function getNodeState(apiCatalog, apiKey) {
   if (typeof raw !== 'object') return 'none';
   const status = (raw.match_status || '').toLowerCase();
   if (status === 'exact') return 'exact';
-  if (status === 'partial') return 'partial';
   return 'none';
 }
 
@@ -34,8 +33,7 @@ export function FlowDiagram({ journey, persona, apiCatalog, onAPIClick, onMissin
           const state = getNodeState(apiCatalog, step.api);
           const ragResult = typeof apiCatalog[step.api] === 'object' ? apiCatalog[step.api] : null;
           const api = ragResult?.matched_api || null;
-          const enhancements = ragResult?.enhancements || [];
-          const isFound = state === 'exact' || state === 'partial';
+          const isFound = state === 'exact';
           const isLoading = state === 'loading';
 
           let borderColor = theme.redBorder;
@@ -49,16 +47,12 @@ export function FlowDiagram({ journey, persona, apiCatalog, onAPIClick, onMissin
             borderColor = theme.greenBorder;
             bgColor = theme.greenBg;
             badge = 'live';
-          } else if (state === 'partial') {
-            borderColor = theme.amberBorder;
-            bgColor = theme.amberBg;
-            badge = 'enhance';
           }
 
           const handleClick = () => {
             if (isLoading) return;
             if (isFound && api && onAPIClick) {
-              onAPIClick(step.api, api, state === 'partial' ? enhancements : null);
+              onAPIClick(step.api, api, null);
             } else if (state === 'none' && onMissingClick) {
               onMissingClick(step.api);
             }
@@ -150,35 +144,6 @@ export function FlowDiagram({ journey, persona, apiCatalog, onAPIClick, onMissin
                         {api.latency || '—'}
                       </div>
                       <Dot status="live" />
-                    </>
-                  )}
-                  {state === 'partial' && api && (
-                    <>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: theme.amber,
-                          fontFamily: fonts.sans,
-                          lineHeight: 1.3,
-                          marginBottom: 3,
-                        }}
-                      >
-                        {api.name}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 10,
-                          color: theme.amber + '99',
-                          fontFamily: fonts.mono,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {api.latency || '—'}
-                      </div>
-                      <Dot status="enhance" />
                     </>
                   )}
                   {state === 'none' && (

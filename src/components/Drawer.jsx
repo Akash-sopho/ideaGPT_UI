@@ -8,11 +8,10 @@ const methodColor = {
   PUT: { bg: theme.blueBg, col: theme.blue, border: theme.blueBorder },
 };
 
-export function Drawer({ api, enhancements, matchStatus, onClose }) {
+export function Drawer({ api, matchStatus, onClose }) {
   if (!api) return null;
 
   const methodStyle = methodColor[api.method] || { bg: theme.alt, col: theme.muted, border: theme.border };
-  const hasEnhancements = Array.isArray(enhancements) && enhancements.length > 0;
 
   return (
     <div
@@ -215,34 +214,6 @@ export function Drawer({ api, enhancements, matchStatus, onClose }) {
                 </div>
               )}
             </div>
-          </div>
-        )}
-        {hasEnhancements && (
-          <div
-            style={{
-              margin: '0 30px 24px',
-              padding: 15,
-              background: theme.amberBg,
-              border: `1px solid ${theme.amberBorder}`,
-              borderRadius: 10,
-            }}
-          >
-            <div
-              style={{
-                color: theme.faint,
-                fontSize: 11,
-                letterSpacing: 2,
-                fontFamily: fonts.mono,
-                marginBottom: 10,
-              }}
-            >
-              ENHANCEMENTS
-            </div>
-            <ul style={{ margin: 0, paddingLeft: 18, color: theme.ink, fontSize: 13, lineHeight: 1.7 }}>
-              {enhancements.map((e, i) => (
-                <li key={i}>{e}</li>
-              ))}
-            </ul>
           </div>
         )}
       </div>

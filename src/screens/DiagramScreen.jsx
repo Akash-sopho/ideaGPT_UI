@@ -142,7 +142,6 @@ export function DiagramScreen({
       <div style={{ display: 'flex', gap: 18, marginBottom: 18, flexWrap: 'wrap' }}>
         {[
           [theme.green, theme.greenBg, theme.greenBorder, 'solid', cfg.legendExact],
-          [theme.amber, theme.amberBg, theme.amberBorder, 'solid', cfg.legendPartial],
           [theme.red, theme.redBg, theme.redBorder, 'dashed', cfg.legendNone],
         ].map(([c, bg, border, dash, lbl]) => (
           <div key={lbl} style={{ display: 'flex', gap: 7, alignItems: 'center', fontSize: 12, color: theme.muted }}>

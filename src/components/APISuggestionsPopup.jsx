@@ -378,24 +378,6 @@ export function APISuggestionsPopup({
             )}
           </div>
 
-          {enhancements.length > 0 && (
-            <div
-              style={{
-                padding: 12,
-                background: theme.amberBg,
-                border: `1px solid ${theme.amberBorder}`,
-                borderRadius: 10,
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ color: theme.faint, fontSize: 11, fontFamily: fonts.mono, marginBottom: 6 }}>ENHANCEMENTS</div>
-              <ul style={{ margin: 0, paddingLeft: 18, color: theme.ink, fontSize: 12, lineHeight: 1.5 }}>
-                {enhancements.slice(0, 3).map((e, i) => (
-                  <li key={i}>{e}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       </div>
     </div>
