@@ -3,6 +3,7 @@ import { theme, fonts, personaColorMap } from './config/theme.config';
 import { appConfig } from './config/app.config';
 import { scanConfig } from './config/scan.config';
 import { fetchFeatures } from './api/features';
+import { sendChat, summariseIdea } from './api/chat';
 import { suggestPersonas } from './api/personas';
 import { generateJourneys } from './api/journeys';
 import { describeApiKey } from './api/describe';
@@ -38,12 +39,18 @@ export default function App() {
   const [apiCatalog, setApiCatalog] = useState({});
   const [descriptionCache, setDescriptionCache] = useState({});
   const [jiraTickets, setJiraTickets] = useState({});
+  const [chatMessages, setChatMessages] = useState([]);
+  const [summaryResult, setSummaryResult] = useState(null);
+  const [loadingChat, setLoadingChat] = useState(false);
+  const [loadingSummarise, setLoadingSummarise] = useState(false);
   const [loadingFeatures, setLoadingFeatures] = useState(false);
   const [loadingPersonaSuggestions, setLoadingPersonaSuggestions] = useState(false);
   const [loadingJourneys, setLoadingJourneys] = useState(false);
   const [scanProgress, setScanProgress] = useState({ total: 0, done: 0, current: '' });
   const [loadingJira, setLoadingJira] = useState(false);
   const [errors, setErrors] = useState({
+    chat: null,
+    summarise: null,
     features: null,
     personaSuggestions: null,
     journeys: null,
@@ -57,21 +64,67 @@ export default function App() {
 
   const clearError = (key) => setErrors((e) => ({ ...e, [key]: null }));
 
-  const handleAnalyseIdea = useCallback(async () => {
-    if (!idea.trim()) return;
+  const handleSendMessage = useCallback(
+    async (content) => {
+      const trimmed = (content || '').trim();
+      if (!trimmed || loadingChat) return;
+      const newUserMessage = { role: 'user', content: trimmed };
+      const nextMessages = [...chatMessages, newUserMessage];
+      setChatMessages(nextMessages);
+      setLoadingChat(true);
+      setErrors((e) => ({ ...e, chat: null }));
+      try {
+        const res = await sendChat({ messages: nextMessages, idea_context: idea });
+        setChatMessages((prev) => [...prev, { role: 'assistant', content: res.reply || '' }]);
+      } catch (err) {
+        setErrors((e) => ({ ...e, chat: appConfig.ideaScreen?.errors?.chat || appConfig.errors?.chat || 'Could not send message' }));
+        setChatMessages((prev) => prev.slice(0, -1));
+      } finally {
+        setLoadingChat(false);
+      }
+    },
+    [chatMessages, idea, loadingChat]
+  );
+
+  const handleSummarise = useCallback(async () => {
+    let messages = [...chatMessages];
+    if (messages.length === 0 && idea.trim()) {
+      messages = [{ role: 'user', content: idea.trim() }];
+    }
+    if (messages.length === 0) return;
+    setLoadingSummarise(true);
+    setErrors((e) => ({ ...e, summarise: null }));
+    try {
+      const res = await summariseIdea({ messages });
+      setSummaryResult(res);
+    } catch (err) {
+      setErrors((e) => ({ ...e, summarise: appConfig.ideaScreen?.errors?.summarise || appConfig.errors?.summarise || 'Could not summarise' }));
+    } finally {
+      setLoadingSummarise(false);
+    }
+  }, [chatMessages, idea]);
+
+  const handleContinueChat = useCallback(() => {
+    setSummaryResult(null);
+  }, []);
+
+  const handleContinueToFeatures = useCallback(async () => {
+    if (!summaryResult?.idea) return;
     setLoadingFeatures(true);
     setErrors((e) => ({ ...e, features: null }));
     try {
-      const res = await fetchFeatures(idea);
+      setIdea(summaryResult.idea);
+      setIdeaSummary(summaryResult.idea_summary || '');
+      const res = await fetchFeatures(summaryResult.idea);
       setFeatures(res.features || []);
-      setIdeaSummary(res.idea_summary || '');
+      if (res.idea_summary && !summaryResult.idea_summary) setIdeaSummary(res.idea_summary);
       setPhase('features');
     } catch (err) {
       setErrors((e) => ({ ...e, features: appConfig.errors?.features || 'Could not analyse idea' }));
     } finally {
       setLoadingFeatures(false);
     }
-  }, [idea]);
+  }, [summaryResult]);
 
   const handleMapJourneys = useCallback(async () => {
     const selectedFeatures = features.filter((f) => f.on).map((f) => f.title);
@@ -421,7 +474,22 @@ export default function App() {
         {phase !== 'idea' && phase !== 'scanning' && <Steps phase={phase} />}
 
         {phase === 'idea' && (
-          <IdeaScreen idea={idea} setIdea={setIdea} onAnalyse={handleAnalyseIdea} loading={loadingFeatures} />
+          <IdeaScreen
+            idea={idea}
+            setIdea={setIdea}
+            chatMessages={chatMessages}
+            onSendMessage={handleSendMessage}
+            loadingChat={loadingChat}
+            onSummarise={handleSummarise}
+            loadingSummarise={loadingSummarise}
+            summaryResult={summaryResult}
+            onContinueChat={handleContinueChat}
+            onContinueToFeatures={handleContinueToFeatures}
+            loadingFeatures={loadingFeatures}
+            errorChat={errors.chat}
+            errorSummarise={errors.summarise}
+            errorFeatures={errors.features}
+          />
         )}
 
         {phase === 'features' && (

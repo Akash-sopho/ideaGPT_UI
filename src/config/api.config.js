@@ -2,6 +2,8 @@
  * API path and method constants. No secrets, no base URLs.
  */
 export const apiPaths = {
+  chat: '/llm/chat',
+  summarise: '/llm/summarise',
   features: '/llm/features',
   suggestPersonas: '/llm/suggest-personas',
   generateJourneys: '/llm/generate-journeys',
